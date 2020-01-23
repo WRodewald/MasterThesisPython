@@ -11,6 +11,8 @@ import multiprocessing
 
 from matplotlib import pyplot as plt
 
+
+
 # for a given frame, we use the pitch to resynthesize the frame and return the rms error between frame and synth
 def get_error_for_pitch_prediction(frame, pitch_est, pitch_inc_est, fs, num_overtones = 10, plot = False):
     
@@ -24,7 +26,9 @@ def get_error_for_pitch_prediction(frame, pitch_est, pitch_inc_est, fs, num_over
     return err_rms
 
 # function returns the pitch and pitch increment for one frame
-def pitch_optimize_frame(frame, fs, pitch_est = 0, num_overtones = 10):
+# method:   'Nelder-Mead' None
+def pitch_optimize_frame(frame, fs, pitch_est = 0, options = {}):
+
     # fall back to acf for first estimate
     if(pitch_est == 0):
         pitch_est = pitch_acf.pitch_acf_frame(frame,fs)
@@ -32,16 +36,20 @@ def pitch_optimize_frame(frame, fs, pitch_est = 0, num_overtones = 10):
     pitch = pitch_est
     pitch_inc = 0
 
+    # extract options
+    method = options.get('method', None)
+    skip_f0_estimation = options.get('skip_f0_estimation', False)
+    num_overtones = options.get('num_overtones', 10)
+
     # first round of min search
-    fun = lambda args: get_error_for_pitch_prediction(frame, args[0], 0, fs, num_overtones)
-    #res = minimize(fun, [pitch_est], method='Nelder-Mead')
-    res = minimize(fun, [pitch_est])
-    pitch = res.x[0]
+    if(not skip_f0_estimation):
+        fun = lambda args: get_error_for_pitch_prediction(frame, args[0], 0, fs, num_overtones)
+        res = minimize(fun, [pitch], method=method)
+        pitch = res.x[0]
     
     # second round of min search with increment
     fun = lambda args: get_error_for_pitch_prediction(frame, args[0], args[1], fs, num_overtones)
-    #res = minimize(fun, [pitch, 0], method='Nelder-Mead')
-    res = minimize(fun, [pitch, 0])
+    res = minimize(fun, [pitch, 0], method=method)
     pitch = res.x[0]
     pitch_inc = res.x[1]
 
@@ -64,12 +72,15 @@ def pitch_optimize_frame_wrap(args):
     return pitch_optimize_frame(*args)
 
 # function returns the pitch and pitch increment for multiple frames
-def pitch_optize(framed_audio, fs, num_overtones = 10, verbose = False, num_threads = 1):
+def pitch_optimize(framed_audio, fs, pitch_estimate = None, options={}, num_threads = 1):
 
     N = framed_audio.get_num_frames()
 
     # run acf pitch estimate
-    pitch_est = pitch_acf.pitch_acf(framed_audio,fs)
+    if pitch_estimate is None: 
+        pitch_estimate = pitch_acf.pitch_acf(framed_audio,fs)
+
+    assert pitch_estimate.size == N, 'pitch_optimize: Invalid pitch estimate'
 
     # output vectors
     pitch     = np.zeros(N)
@@ -78,13 +89,13 @@ def pitch_optize(framed_audio, fs, num_overtones = 10, verbose = False, num_thre
     
     print("Running optimized pitch extraction, block size=%d, hop size=%d"% (framed_audio.block_size, framed_audio.hop_size))
     
-    if(num_threads == 0):
+    if(num_threads == 1):
 
         # analysis per frame
         for i in tqdm(range(N)):
             frame = framed_audio.get_frame(i)
 
-            frame_pitch, frame_pitch_inc = pitch_optimize_frame(frame, fs, pitch_est[i], num_overtones)
+            frame_pitch, frame_pitch_inc = pitch_optimize_frame(frame, fs, pitch_estimate[i], options)
 
             pitch[i] = frame_pitch
             pitch_inc[i] = frame_pitch_inc
@@ -93,7 +104,7 @@ def pitch_optize(framed_audio, fs, num_overtones = 10, verbose = False, num_thre
         inputs = []
 
         for i in range(N):
-            inputs.append((framed_audio.get_frame(i), fs, pitch_est[i], num_overtones))
+            inputs.append((framed_audio.get_frame(i), fs, pitch_estimate[i], options))
         
         with multiprocessing.Pool(processes=num_threads) as pool:            
             results = list(tqdm(pool.imap(pitch_optimize_frame_wrap, inputs ), total=N ))
