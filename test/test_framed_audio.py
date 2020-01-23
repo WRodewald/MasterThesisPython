@@ -53,7 +53,28 @@ class Test_FramedAudio(unittest.TestCase):
         self.assertEqual(audio.get_num_frames(), 4)
 
 
+    def test_get_time(self):   
+        audio = FramedAudio(np.arange(512), 256,256)
+
+        expected = np.array([0., 1.])
+        result   = audio.get_time(256, False)
+        self.assertTrue(np.array_equal(expected, result))
+                
+        expected = np.array([0.5, 1.5])
+        result   = audio.get_time(256, True)
+        self.assertTrue(np.array_equal(expected, result))
+
         
+        audio = FramedAudio(np.arange(512), 256, 256, centered=True)
+        
+        expected = np.array([-0.5, 0.5])
+        result   = audio.get_time(256, False)
+        self.assertTrue(np.array_equal(expected, result))
+                
+        expected = np.array([0., 1.])
+        result   = audio.get_time(256, True)
+        self.assertTrue(np.array_equal(expected, result))
+
 
     def test_get_num_frames(self):                
         audio = FramedAudio(np.zeros((1,128)),256, 128)   
@@ -86,11 +107,6 @@ class Test_FramedAudio(unittest.TestCase):
         expected =  np.array([3,4,5,6])
         self.assertTrue(np.array_equal(frame, expected))
         
-        # expecting zero padded last frame
-        frame = audio.get_frame(2)    
-        expected =  np.array([5,6,0,0])
-        self.assertTrue(np.array_equal(frame, expected))
-
 
     def test_get_raw(self):      
         

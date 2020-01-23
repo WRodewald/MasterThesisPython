@@ -21,15 +21,24 @@ class FramedAudio:
         if(centered):
             self.offset = int(-0.5 * self.block_size)
 
-
-
+    # returns the origina audio signal
     def get_raw(self): 
         return self.array
 
+    # returns the number of frames necessary to fully cover the audio
     def get_num_frames(self):
         return  1 + max(0,int(np.floor(self.array.size - self.block_size - self.offset)/self.hop_size))
 
 
+    # returns a time vector for each frame
+    # with centered=True, get_time return the time at the center of each frame.
+    def get_time(self, fs, centered=True):
+        samples = self.hop_size * np.arange(float(self.get_num_frames())) + self.offset
+        if(centered): samples += 0.5 * self.block_size
+
+        return samples / fs
+
+    # returns the frame <idx>
     def get_frame(self, idx):
 
         assert(idx < self.get_num_frames())
@@ -41,7 +50,6 @@ class FramedAudio:
         if(first_idx < 0):
             pre_pad = 0 - first_idx
             first_idx = 0
-        
-            
+                    
         frame = self.array[first_idx:last_idx]
         return np.pad(frame, (pre_pad, self.block_size-frame.size-pre_pad))
