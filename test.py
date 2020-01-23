@@ -5,6 +5,8 @@ from tools import pitch_optimize
 
 from tools import dataset
 
+from tools import extract_overtones
+
 import numpy as np
 
 from matplotlib import pyplot as plt
@@ -13,6 +15,7 @@ import crepe.core
 
 import warnings
 
+from tqdm import tqdm
 from scipy import interpolate
 
 if __name__ == '__main__':
@@ -25,8 +28,11 @@ if __name__ == '__main__':
     vocalset_root = dataset.get_root_path()
     src_file = vocalset_root + '/female4/scales/slow_forte/f4_scales_c_slow_forte_o.ogg'
 
+    
+
     data, fs = audio_io.read(src_file)   
-    audio = framed_audio.FramedAudio(data, block_size, hop_size, centered=True)
+    data = data[200000:300000]
+    audio = framed_audio.FramedAudio(data, fs, block_size, hop_size, centered=True)
     
     # run crepe
     step_size = 5
@@ -48,6 +54,8 @@ if __name__ == '__main__':
                                                     num_threads=15)
 
 
+
     plt.plot(crepe_time, crepe_pitch, time, pitch)
     plt.show()
+
 
