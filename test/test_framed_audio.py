@@ -129,7 +129,7 @@ class Test_FramedAudio(unittest.TestCase):
         
         vector = np.arange(128)
         audio = FramedAudio(vector, 44100, 4, 2)
-        
+      
         traj = np.arange(audio.get_num_frames())
         audio.store_trajectory('traj', traj)
 
@@ -171,7 +171,7 @@ class Test_FramedAudio(unittest.TestCase):
         vector = np.arange(128)
         audio = FramedAudio(vector, 44100, 4, 2)
         
-        cfg = audio.get_config();
+        cfg = audio.get_config()
         self.assertEqual(cfg['fs'], 44100)
         self.assertEqual(cfg['block-size'], 4)
         self.assertEqual(cfg['hop-size'], 2)

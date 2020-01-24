@@ -37,7 +37,7 @@ def pitch_optimize_frame(frame, fs, pitch_est = 0, options = {}):
     pitch_inc = 0
 
     # extract options
-    method = options.get('method', None)
+    method = options.get('method', 'Nelder-Mead')
     skip_f0_estimation = options.get('skip_f0_estimation', False)
     num_overtones = options.get('num_overtones', 10)
 

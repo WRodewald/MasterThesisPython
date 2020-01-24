@@ -15,7 +15,7 @@ class Test_pitch_acf(unittest.TestCase):
         f0Sweep = np.linspace(200, 800, 8 * block_size)
         phase = np.add.accumulate(2. * np.pi * f0Sweep / fs)
         x  = np.sin(phase)
-        audio = FramedAudio(x, block_size, block_size)
+        audio = FramedAudio(x, fs, block_size, block_size)
 
         pitch = pitch_acf(audio,fs)
         pitch_reference = f0Sweep[0:-1:block_size]
