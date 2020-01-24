@@ -4,6 +4,8 @@ import json
 
 from . import audio_io
 
+# TODO implement feature to write to a framed audio in addition to reading frames from it?
+
 # wrapper for an audio piece, with support for
 #   frames, with hop-size, block-size, 
 class FramedAudio:
@@ -12,10 +14,6 @@ class FramedAudio:
     hop_size=512
     block_size = 1024
     centered = False
-
-
-
-
     fs = 44100
 
     # raw audio buffer
@@ -24,26 +22,31 @@ class FramedAudio:
     # path to a wav file in case the object gets constructed with a file
     src_file = None
 
-    # generic attributes
-    attr = {}
+    # trajectories, dict of np.arrays' with size == get_num_frames()
+    trajectories = {}
 
-
-
-    def __init__(self, audio, fs, block_size, hop_size, centered=False):
+    def __init__(self, audio, fs=44100, block_size=2048, hop_size=512, centered=False, config=None):
 
         self.array = audio
         self.fs = fs
         self.block_size = block_size
         self.hop_size = hop_size      
         self.centered = centered
-        self.attr = {}
+        self.trajectories = {}
+
+        if(not config is None):
+            self.set_config(config)
             
     @staticmethod
-    def from_file(src, block_size, hop_size, centered=False):
+    def from_file(src,block_size=2048, hop_size=512, centered=False, config=None):
         
         array, fs = audio_io.read(src)
         audio = FramedAudio(array, fs, block_size, hop_size, centered)
         audio.src_file = src
+        
+        if(not config is None):
+            audio.set_config(config)
+
         return audio
 
 
@@ -60,12 +63,12 @@ class FramedAudio:
 
     # returns a time vector for each frame
     # with centered=True, get_time return the time at the center of each frame.
-    def get_time(self, fs, centered=True):
+    def get_time(self, centered=True):
         offset = int(-0.5 * self.block_size) if self.centered else 0
         samples = self.hop_size * np.arange(float(self.get_num_frames())) + offset
         if(centered): samples += 0.5 * self.block_size
 
-        return samples / fs
+        return samples / self.fs
 
     # returns the frame <idx>
     def get_frame(self, idx):
@@ -87,17 +90,16 @@ class FramedAudio:
     # sets an attribute to be exported / cached as json
     def store_trajectory(self, attr_key, attr_val):
         assert attr_val.size == self.get_num_frames(), 'a trajectory must have the same number of samples as frames'
-        self.attr[attr_key] = attr_val
+        self.trajectories[attr_key] = attr_val
         
     def get_trajectory(self, attr_key):
-        if(attr_key in self.attr):
-            return self.attr[attr_key]
+        if(attr_key in self.trajectories):
+            return self.trajectories[attr_key]
 
         return None
 
 
     def get_config(self):
-        print('get_config')
 
         cfg = {}
         cfg['hop-size']   = self.hop_size
@@ -110,22 +112,28 @@ class FramedAudio:
     # sets the config with the given dict
     # throws an Exception when this 
     def set_config(self, cfg):      
-        print('set_config')
-
         if(self.get_config() == cfg): 
             return
 
         self.hop_size   = cfg['hop-size']
         self.block_size = cfg['block-size']
         self.centered   = cfg['centered']
-        self.fs         = cfg['fs']
+        if('fs' in cfg): self.fs = cfg['fs']
 
-        print(len(self.attr))
-        if(len(self.attr) > 0):
+        if(len(self.trajectories) > 0):
             print('FUCK')
             #raise Exception('Changing config with stored trajectories may result in unexpected behaviour')
 
+    # checks if all config attribuetes in cfg are 
+    def matches_cfg(self, config):
 
+        my_cfg = self.get_config()
+        
+        all_match = True
+        for key in config:
+            all_match &= (key in my_cfg) and (my_cfg[key] == config[key])
+
+        return all_match
 
     def save_json(self, json_file):
 
@@ -140,8 +148,8 @@ class FramedAudio:
 
         # trajectories (pitch, etc)
         data['data'] = {}
-        for key in self.attr:
-            data['data'][key] = self.attr[key].tolist()
+        for key in self.trajectories:
+            data['data'][key] = self.trajectories[key].tolist()
 
         # write
         with open(json_file, 'w+') as outfile:
@@ -150,34 +158,34 @@ class FramedAudio:
     @staticmethod
     def from_json(json_file):
 
-        with open(json_file) as json_dict:       
+        try:
+            with open(json_file) as json_dict:       
 
-            data = json.load(json_dict)
-            
-            # config
-            cfg = data['config']
-
-            # attributes
-            attr = {}
-            for key in data['data']:
-                attr[key] = np.asarray(data['data'][key])
-
-            # src file  
-            src = None
-            if('src' in data):
-                src = data['src']
-
-            # create object
-            if(not src is None):
-                obj = FramedAudio.from_file(src, cfg['block-size'], cfg['hop-size'], cfg['centered'])
-                obj.attr = attr
-                return obj
-
-            else:
-                dummy_src = np.zeros(cfg['block-size'])
-                obj = FramedAudio(dummy_src, cfg['fs'], cfg['block-size'], cfg['hop-size'], cfg['centered'])
-                obj.attr = attr
-                return obj
+                data = json.load(json_dict)
                 
+                # config
+                cfg = data['config']
 
-        raise Exception('Could not open json file: ' + json_file)
+                # attributes
+                trajectories = {}
+                for key in data['data']:
+                    trajectories[key] = np.asarray(data['data'][key])
+
+                # src file  
+                src = None
+                if('src' in data):
+                    src = data['src']
+
+                # create object
+                if(not src is None):
+                    obj = FramedAudio.from_file(src, config=cfg)
+                    obj.trajectories = trajectories
+                    return obj
+
+                else:
+                    dummy_src = np.zeros(cfg['block-size'])
+                    obj = FramedAudio(dummy_src, config=cfg)
+                    obj.trajectories = trajectories
+                    return obj
+        except:
+            return None

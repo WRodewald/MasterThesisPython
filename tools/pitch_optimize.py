@@ -72,9 +72,10 @@ def pitch_optimize_frame_wrap(args):
     return pitch_optimize_frame(*args)
 
 # function returns the pitch and pitch increment for multiple frames
-def pitch_optimize(framed_audio, fs, pitch_estimate = None, options={}, num_threads = 1):
+def pitch_optimize(framed_audio, pitch_estimate = None, options={}, num_threads = 1):
 
     N = framed_audio.get_num_frames()
+    fs = framed_audio.fs
 
     # run acf pitch estimate
     if pitch_estimate is None: 

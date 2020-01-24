@@ -14,9 +14,14 @@ class Test_FramedAudio(unittest.TestCase):
 
         audio = FramedAudio.from_file(src, 2048, 1024, True)
 
+        audio2 = FramedAudio.from_file(src, config={'block-size':2048, 'hop-size':1024, 'centered':True})
+
+        self.assertEqual(audio.get_config(), audio2.get_config())
+
         array, _ = audio_io.read(src)
 
         self.assertTrue(np.array_equal(array, audio.array))
+
 
     def test_centered(self):    
         audio = FramedAudio(np.arange(512), 44100, 256,128, centered=True)
@@ -62,25 +67,25 @@ class Test_FramedAudio(unittest.TestCase):
 
 
     def test_get_time(self):   
-        audio = FramedAudio(np.arange(512), 44100, 256,256)
+        audio = FramedAudio(np.arange(512), 256, 256,256)
 
         expected = np.array([0., 1.])
-        result   = audio.get_time(256, False)
+        result   = audio.get_time(False)
         self.assertTrue(np.array_equal(expected, result))
                 
         expected = np.array([0.5, 1.5])
-        result   = audio.get_time(256, True)
+        result   = audio.get_time(True)
         self.assertTrue(np.array_equal(expected, result))
 
         
-        audio = FramedAudio(np.arange(512), 44100, 256, 256, centered=True)
+        audio = FramedAudio(np.arange(512), 256, 256, 256, centered=True)
         
         expected = np.array([-0.5, 0.5])
-        result   = audio.get_time(256, False)
+        result   = audio.get_time(False)
         self.assertTrue(np.array_equal(expected, result))
                 
         expected = np.array([0., 1.])
-        result   = audio.get_time(256, True)
+        result   = audio.get_time(True)
         self.assertTrue(np.array_equal(expected, result))
 
 
@@ -153,7 +158,6 @@ class Test_FramedAudio(unittest.TestCase):
 
         self.assertTrue( np.array_equal(audio.get_trajectory('traj'), audio2.get_trajectory('traj')))
         self.assertEqual( audio.get_config(), audio2.get_config())
-        # todo impl test with from_file 
 
         src = 'test/audio_sample.ogg'
 
@@ -166,6 +170,9 @@ class Test_FramedAudio(unittest.TestCase):
         self.assertEqual( audio.src_file, audio2.src_file)
         self.assertTrue( np.array_equal(audio.array, audio2.array))
 
+
+        audio3 = FramedAudio.from_json('non-existing.json')
+        self.assertTrue(audio3 is None)
 
     def test_set_get_config(self):
         vector = np.arange(128)
@@ -182,7 +189,15 @@ class Test_FramedAudio(unittest.TestCase):
         audio2.set_config(cfg)
         self.assertEqual(audio2.get_config(), cfg)
 
+    
+    def test_matches_cfg(self):
+        vector = np.arange(128)
+        audio = FramedAudio(vector, 44100, 4, 2)
 
+        self.assertTrue(audio.matches_cfg({'fs':44100}))
+        self.assertFalse(audio.matches_cfg({'fs':48100}))
+        self.assertFalse(audio.matches_cfg({'no-key':44100}))
+        self.assertTrue(audio.matches_cfg(audio.get_config()))
 
 
 
