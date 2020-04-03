@@ -15,4 +15,6 @@ The path will be stored in `build/vocalset.json`.
 ``matplotlib``\
 ``tensorflow``\
 ``crepe`` (https://github.com/marl/crepe)\
-``tqdm`` (https://github.com/tqdm/tqdm)
+``tqdm`` (https://github.com/tqdm/tqdm)\
+``pandas``\
+``packaging``

@@ -33,7 +33,7 @@ if __name__ == '__main__':
 
     # dataset & audio
     vocalset_root = dataset.get_root_path()
-    src_file = vocalset_root + '/female4/scales/slow_forte/f4_scales_c_slow_forte_o.ogg'
+    src_file = vocalset_root + '/female4/scales/slow_forte/f4_scales_c_slow_forte_o.wav'
 
     json_tmp = 'build/sample.json'
 
