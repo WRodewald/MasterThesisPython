@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 
 from time import time
 
+from tools import MagToDBLayer, ZPKToMagLayer, NormalizeLayer 
 
 from datetime import datetime
 from packaging import version
@@ -25,12 +26,6 @@ from tensorflow import keras
 config = tf.compat.v1.ConfigProto()
 config.gpu_options.allow_growth = True
 session = tf.compat.v1.Session(config=config)
-
-#device_name = tf.test.gpu_device_name()
-#if device_name != '/device:GPU:0':
-#  raise SystemError('GPU device not found')
-#print('Found GPU at: {}'.format(device_name))
-
 
 # %% 
 
@@ -43,20 +38,13 @@ data = pd.read_csv(dataset, sep=";")
 predictor = data.iloc[:,(0)]
 response  = data.iloc[:,1:41]
 predictor = predictor.to_numpy()
-response = response.to_numpy()
+response  = response.to_numpy()
 
 predictor = predictor[:,None]
 
 # manual normalization
-predictor_offset = np.min(predictor);
-predictor_scale  = np.max(predictor) - np.min(predictor);
-predictor -= predictor_offset
-predictor /= predictor_scale
-
-response_offset = np.min(response);
-response_scale  = np.max(response) - np.min(response);
-response -= response_offset;
-response /= response_scale;
+predictor_mean = np.mean(predictor)
+predictor_std  = np.std(predictor)
 
 num_samples = response.shape[0]
 
@@ -81,20 +69,19 @@ def split_train_test_eval_indices(num_samples, train_split, val_split, test_spli
 #%% Build Model
 print('Build Model')
 
-from tools import ZPKToMagLayer
-
 inputs = keras.Input(shape=(1,), name='input')
-x = tf.keras.layers.Dense(10,  activation='sigmoid', name='dense_1')(inputs)
-x = tf.keras.layers.Dense(40,  activation='sigmoid', name='dense_2')(x)
-x = tf.keras.layers.Dense(80,  activation='sigmoid', name='dense_3')(x)
-x = tf.keras.layers.Dense(160, activation='sigmoid', name='dense_4')(x)
-x = tf.keras.layers.Dense(40,  activation='sigmoid', name='dense_5')(x)
-x = tf.keras.layers.Dense(41,  activation='sigmoid', name='dense_6')(x)
+x = inputs
+x = NormalizeLayer.NormalizeLayer(predictor_mean, predictor_std, name='normalize')(x)
+x = tf.keras.layers.Dense(128,  activation='sigmoid', name='dense_1')(x)
+x = tf.keras.layers.Dense(128,  activation='sigmoid', name='dense_2')(x)
+x = tf.keras.layers.Dense(256,  activation='sigmoid', name='dense_3')(x)
+x = tf.keras.layers.Dense(81,  name='dense_5')(x)
 x = ZPKToMagLayer.ZPKToMagLayer(44100, 40, name='zpk')([x,inputs])
+x = MagToDBLayer.MagToDBLayer(name='mag2db')(x)
 model = keras.Model(inputs=inputs, outputs=x)
   
 # compile
-model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=10E-4),
+model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=10E-5),
     loss=keras.losses.mean_squared_error,
     metrics=[])
 
@@ -120,9 +107,9 @@ logs = "logs\\" + datetime.now().strftime("%Y%m%d-%H%M%S")
 tboard_callback = tf.keras.callbacks.TensorBoard(log_dir = logs, histogram_freq = 1)
 
 start = time();
-model.fit(x=predictor[train_idx,:], y=response[train_idx,:], epochs = 100, 
-          batch_size=40024,
-          validation_data=(predictor[val_idx,:], response[val_idx,:]),
+model.fit(x=predictor[train_idx,:], y=response[train_idx,:], epochs = 5000, 
+          batch_size=40000,
+          validation_data=(predictor[train_idx,:], response[train_idx,:]),
           callbacks=[])
 print(time() - start)
           
@@ -131,12 +118,9 @@ print("Log Results")
 
 predicted = model.predict(predictor)
 
-pred_scaled = predicted * response_scale + response_offset;
-resp_scaled = response  * response_scale + response_offset;
-
-error_test  = np.mean(np.mean(np.abs(pred_scaled[train_idx,:] - resp_scaled[train_idx,:])))
-error_val   = np.mean(np.mean(np.abs(pred_scaled[val_idx,:]   - resp_scaled[val_idx,:])))
-error_train = np.mean(np.mean(np.abs(pred_scaled[test_idx,:]  - resp_scaled[test_idx,:])))
+error_test  = np.mean(np.mean(np.abs(predicted[train_idx,:] - response[train_idx,:])))
+error_val   = np.mean(np.mean(np.abs(predicted[val_idx,:]   - response[val_idx,:])))
+error_train = np.mean(np.mean(np.abs(predicted[test_idx,:]  - response[test_idx,:])))
 
 print(f' Test  Error:      {error_test:.2f}')
 print(f' Validation Error: {error_val:.2f}')
@@ -148,6 +132,6 @@ print(f' Train Error:      {error_train:.2f}')
 # %%
 
 
-plt.plot(pred_scaled[500,:])
-plt.plot(resp_scaled[500,:])
+plt.plot(predicted[500,:])
+plt.plot(response[500,:])
 plt.show()
