@@ -6,17 +6,31 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+#os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 import math
 import functools
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from time import time
+
+
 from datetime import datetime
 from packaging import version
 
 import tensorflow as tf
 from tensorflow import keras
+
+config = tf.compat.v1.ConfigProto()
+config.gpu_options.allow_growth = True
+session = tf.compat.v1.Session(config=config)
+
+#device_name = tf.test.gpu_device_name()
+#if device_name != '/device:GPU:0':
+#  raise SystemError('GPU device not found')
+#print('Found GPU at: {}'.format(device_name))
+
 
 # %% 
 
@@ -34,14 +48,14 @@ response = response.to_numpy()
 predictor = predictor[:,None]
 
 # manual normalization
-predictor_offset = predictor.mean(axis=0)
+predictor_offset = np.min(predictor);
+predictor_scale  = np.max(predictor) - np.min(predictor);
 predictor -= predictor_offset
-predictor_scale = predictor.var(axis=0)
 predictor /= predictor_scale
 
-response_offset = response.mean(axis=0);
+response_offset = np.min(response);
+response_scale  = np.max(response) - np.min(response);
 response -= response_offset;
-response_scale = response.var(axis=0);
 response /= response_scale;
 
 num_samples = response.shape[0]
@@ -67,29 +81,33 @@ def split_train_test_eval_indices(num_samples, train_split, val_split, test_spli
 #%% Build Model
 print('Build Model')
 
-inputs = keras.Input(shape=(1,), name='input')
-x = tf.keras.layers.Dense(10, activation='relu', name='dense_1')(inputs)
-x = tf.keras.layers.Dense(20, activation='relu', name='dense_2')(x)
-x = tf.keras.layers.Dense(40, activation='relu', name='dense_3')(x)
-x = tf.keras.layers.Dense(40, activation='relu', name='dense_4')(x)
-x = tf.keras.layers.Dense(40, activation='relu', name='zpk')(x)
+from tools import ZPKToMagLayer
 
-outputs = tf.keras.layers.Dense(40, name='output')(x)
-model = keras.Model(inputs=inputs, outputs=outputs)
-    
+inputs = keras.Input(shape=(1,), name='input')
+x = tf.keras.layers.Dense(10,  activation='sigmoid', name='dense_1')(inputs)
+x = tf.keras.layers.Dense(40,  activation='sigmoid', name='dense_2')(x)
+x = tf.keras.layers.Dense(80,  activation='sigmoid', name='dense_3')(x)
+x = tf.keras.layers.Dense(160, activation='sigmoid', name='dense_4')(x)
+x = tf.keras.layers.Dense(40,  activation='sigmoid', name='dense_5')(x)
+x = tf.keras.layers.Dense(41,  activation='sigmoid', name='dense_6')(x)
+x = ZPKToMagLayer.ZPKToMagLayer(44100, 40, name='zpk')([x,inputs])
+model = keras.Model(inputs=inputs, outputs=x)
+  
 # compile
-model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=10E-3),
+model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=10E-4),
     loss=keras.losses.mean_squared_error,
     metrics=[])
 
 model.summary()
 
+
+
 #%% randomize test /split
 
 # fit / train split
-train_split  = 0.4;
-test_split   = 0.3;
-val_split    = 0.3;
+train_split  = 0.7;
+test_split   = 0.15;
+val_split    = 0.15;
 
 train_idx, val_idx, test_idx = split_train_test_eval_indices(num_samples, train_split, val_split, test_split)
 
@@ -101,9 +119,12 @@ print('Train Model')
 logs = "logs\\" + datetime.now().strftime("%Y%m%d-%H%M%S")
 tboard_callback = tf.keras.callbacks.TensorBoard(log_dir = logs, histogram_freq = 1)
 
+start = time();
 model.fit(x=predictor[train_idx,:], y=response[train_idx,:], epochs = 100, 
-          batch_size=400000,
-          validation_data=(predictor[val_idx,:], response[val_idx,:]))
+          batch_size=40024,
+          validation_data=(predictor[val_idx,:], response[val_idx,:]),
+          callbacks=[])
+print(time() - start)
           
 #%% predict data and plot
 print("Log Results")
@@ -123,4 +144,10 @@ print(f' Train Error:      {error_train:.2f}')
 
 
 
+
 # %%
+
+
+plt.plot(pred_scaled[500,:])
+plt.plot(resp_scaled[500,:])
+plt.show()
