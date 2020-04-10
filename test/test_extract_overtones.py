@@ -3,6 +3,10 @@ import numpy as np
 
 import unittest
 
+import os
+import sys
+sys.path.append(os.getcwd())
+
 import tools
 from tools.extract_overtones import extract_ovetones
 from tools.framed_audio import FramedAudio
@@ -13,16 +17,19 @@ class Test_extract_overtones(unittest.TestCase):
 
     def test_extract_overtones(self):
 
+
         block_size = 800
         fs = 20000
-        phase_offset = 0.5*np.pi
-        f0_sweep = np.linspace(100, 100, block_size)
-        phase = np.add.accumulate((2. * np.pi * f0_sweep) / fs)
-        frame = np.cos(phase + phase_offset)
+        phase_offset = 0.5 * np.pi
+        freq = 100.
+       
+        t = (np.arange(block_size) - 0.5 * block_size + 0.5 )/fs
+
+        frame = np.cos(2. * np.pi * freq * t + phase_offset)
 
         frame_win = frame * np.hanning(frame.size)
 
-        overtones, resynth = extract_ovetones(frame_win, 100, 0, fs)
+        overtones, resynth = extract_ovetones(frame_win, freq, 0, fs)
 
         # since we applied a hanning, we expect our resynthsized signal to
         # have half the magnitude 
@@ -45,16 +52,22 @@ class Test_extract_overtones(unittest.TestCase):
     
     def test_extract_overtones_no_resynth(self):
 
-        block_size = 800
+        block_size = 801
         fs = 20000
-        phase_offset = 0.5*np.pi
-        f0_sweep = np.linspace(100, 100, block_size)
-        phase = np.add.accumulate((2. * np.pi * f0_sweep) / fs)
+        phase_offset = 0.5 * np.pi
+        freq = 100
+        freq_sweep = 400
+
+        t = (np.arange(block_size) - 0.5 * block_size + 0.5)/fs
+
+        phase = 2 * np.pi * (freq * t + 0.5 * freq_sweep * t * t)
+
         frame = np.cos(phase + phase_offset)
+
 
         frame_win = frame * np.hanning(frame.size)
 
-        overtones = extract_ovetones(frame_win, 100, 0, fs, resynthesize=False)
+        overtones = extract_ovetones(frame_win, freq, freq_sweep, fs, resynthesize=False)
 
         # since we applied a hanning, we expect our resynthsized signal to
         # have half the magnitude 

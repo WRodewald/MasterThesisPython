@@ -6,8 +6,8 @@ import numpy as np
 import unittest
 import tensorflow as tf
 
-import tools
-from tools import MagToDBLayer
+import model
+from model import MagToDBLayer
 
 
 class test_MagToDBLayer(unittest.TestCase):

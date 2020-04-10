@@ -83,7 +83,7 @@ class ZPKToMagLayer(tf.keras.layers.Layer):
         Hfb = (z - p0) * (z - tf.math.conj(p0))
 
         # calculate transfer function
-        H = tf.complex(k, 0.) * tf.reduce_sum(Hff / Hfb, 1)
+        H = tf.complex(k, 0.) * tf.reduce_prod(Hff / Hfb, 1)
 
         return H
 

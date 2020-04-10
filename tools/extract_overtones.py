@@ -8,11 +8,9 @@ def extract_ovetones(frame, pitch, pitch_inc, fs, num_overtones = 10, resynthesi
 
     N = frame.size
     
-    t = np.arange(N)/fs
-    f = pitch + pitch_inc * (t - 0.5 * N/fs)
+    t = (np.arange(N) - 0.5 * N + 0.5)/fs
 
-    phase_inc = f / fs
-    phase = np.reshape(np.cumsum(phase_inc),(-1,1))
+    phase = np.reshape(pitch * t + 0.5 * pitch_inc * t * t, (-1,1))
     
     divider = np.exp(1j * 2 * np.pi * k * phase)
 
@@ -20,9 +18,9 @@ def extract_ovetones(frame, pitch, pitch_inc, fs, num_overtones = 10, resynthesi
     overtones /= 0.5 * frame.size
 
     if(resynthesize):
-        resynth = np.exp(1j * 2 * np.pi * k *  phase) * overtones.T\
-                + np.exp(1j * 2 * np.pi * k * -phase) * np.conj(overtones.T)    
-        resynth  = np.real(np.sum(resynth,1)) / 2
+            
+        resynth = 2. * np.abs(overtones.T) * np.cos(2. * np.pi * k * phase + np.angle(overtones.T))
+        resynth = np.real(np.sum(resynth,1)) / 2
 
         return overtones, resynth
     else:

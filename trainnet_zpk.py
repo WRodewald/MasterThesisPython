@@ -5,6 +5,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+#%reset
+
 import os
 #os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 import math
@@ -15,7 +17,7 @@ import matplotlib.pyplot as plt
 
 from time import time
 
-from tools import MagToDBLayer, ZPKToMagLayer, NormalizeLayer 
+from model import MagToDBLayer, ZPKToMagLayer, NormalizeLayer 
 
 from datetime import datetime
 from packaging import version
@@ -47,6 +49,7 @@ predictor_mean = np.mean(predictor)
 predictor_std  = np.std(predictor)
 
 num_samples = response.shape[0]
+sample_rate = 44100
 
 def split_train_test_eval_indices(num_samples, train_split, val_split, test_split):
 
@@ -73,15 +76,13 @@ inputs = keras.Input(shape=(1,), name='input')
 x = inputs
 x = NormalizeLayer.NormalizeLayer(predictor_mean, predictor_std, name='normalize')(x)
 x = tf.keras.layers.Dense(128,  activation='sigmoid', name='dense_1')(x)
-x = tf.keras.layers.Dense(128,  activation='sigmoid', name='dense_2')(x)
-x = tf.keras.layers.Dense(256,  activation='sigmoid', name='dense_3')(x)
-x = tf.keras.layers.Dense(81,  name='dense_5')(x)
-x = ZPKToMagLayer.ZPKToMagLayer(44100, 40, name='zpk')([x,inputs])
+x = tf.keras.layers.Dense(41,  name='dense_2')(x)
+x = ZPKToMagLayer.ZPKToMagLayer(sample_rate, 40, name='zpk')([x,inputs])
 x = MagToDBLayer.MagToDBLayer(name='mag2db')(x)
 model = keras.Model(inputs=inputs, outputs=x)
   
 # compile
-model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=10E-5),
+model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.5*10E-4),
     loss=keras.losses.mean_squared_error,
     metrics=[])
 
@@ -106,12 +107,15 @@ print('Train Model')
 logs = "logs\\" + datetime.now().strftime("%Y%m%d-%H%M%S")
 tboard_callback = tf.keras.callbacks.TensorBoard(log_dir = logs, histogram_freq = 1)
 
-start = time();
-model.fit(x=predictor[train_idx,:], y=response[train_idx,:], epochs = 5000, 
+model.fit(x=predictor[train_idx,:], y=response[train_idx,:], epochs = 2000, 
           batch_size=40000,
-          validation_data=(predictor[train_idx,:], response[train_idx,:]),
+          validation_data=(predictor[val_idx,:], response[val_idx,:]),
           callbacks=[])
-print(time() - start)
+
+
+#%%
+model.save('temp/zpk_model') 
+
           
 #%% predict data and plot
 print("Log Results")
@@ -135,3 +139,26 @@ print(f' Train Error:      {error_train:.2f}')
 plt.plot(predicted[500,:])
 plt.plot(response[500,:])
 plt.show()
+
+
+# %%
+layer_output = model.get_layer('dense_2').output
+
+intermediate_model = tf.keras.models.Model(inputs=model.input,outputs=layer_output)
+ 
+zpk_params = intermediate_model.predict(predictor)
+
+num_instances = zpk_params.shape[0]
+num_bins = 2000
+f0 = 4.
+layer = ZPKToMagLayer.ZPKToMagLayer(sample_rate, num_bins)
+
+f = tf.tile(tf.reshape(f0, [1,1]), [num_instances, 1])
+
+# skip some frames
+
+#for i in range(0, num_instances):
+#    print(i)
+#    response = layer.call([tf.slice(zpk_params, [i,0],[1,-1]), tf.slice(f, [i,0],[1,-1])])
+#    response = MagToDBLayer.MagToDBLayer().call(response)
+

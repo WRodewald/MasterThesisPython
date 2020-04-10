@@ -20,10 +20,10 @@ from scipy import interpolate
 if __name__ == '__main__':
 
     # config
-    hop_size = 64
+    hop_size = 256
     block_size = 2048
 
-    rerun_analysis = True
+    rerun_analysis = False
 
     config = {
         'centered':True,

@@ -7,8 +7,8 @@ import os
 import sys
 sys.path.append(os.getcwd())
 
-import tools
-from tools import ZPKToMagLayer
+import model
+from model import ZPKToMagLayer
 
 import unittest
 import tensorflow as tf
