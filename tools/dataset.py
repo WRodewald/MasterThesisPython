@@ -1,6 +1,7 @@
 import sys
 import json
 import os.path
+import re
 
 # ToDo Implement clean cache function ? 
 # ToDo implement parse functions for the dataset
@@ -85,6 +86,63 @@ def set_vocalset_root_path(dataset_root_path):
         return True
         
     return False
+
+def get_sample(types, modes, vowels, singers):
+
+    # helper finds folders that fit a pattern describes as a list of filters
+    def resolve_folders(path, filter_list):
+
+        # return this path as valid if we have no filters
+        if(len(filter_list) == 0):
+            
+            return [path]
+
+        # take our filter and truncate the list
+        dir_filters = filter_list[0]
+        filter_list = filter_list[1:]
+
+        directories = []
+        for sub_dir in os.listdir(path):
+            sub_path = os.path.join(path, sub_dir)
+            if os.path.isdir(sub_path):
+                if (sub_dir in dir_filters) or ('*' in dir_filters) or (len(dir_filters) == 0):        
+                    found = resolve_folders(os.path.join(path, sub_path), filter_list)
+                    directories.extend(found)
+
+        return directories
+
+
+    # get root path
+    root_path = get_root_path()
+
+    # cleaning input 
+    listify = lambda arg: [arg] if (type(arg) == str) else arg
+    vowels  = listify(vowels)
+    modes   = listify(modes)
+    types   = listify(types)
+    singers = listify(singers)
+
+    # replace short version 'f1' - 'm1' with 'female1' - 'male1'
+    for i, singer in enumerate(singers):
+        singers[i] = re.sub(r"^(m)(.*)", r'male\2', singers[i])
+        singers[i] = re.sub(r"^(f)(.*)", r'female\2', singers[i])
+
+    
+    # collect valid folders
+    paths = resolve_folders(root_path, [singers, types, modes])
+
+    # collect valid files within folders
+    files = []
+    for path in paths:
+        for file in os.listdir(path):
+            full_file = os.path.join(path,file)
+            if os.path.isfile(full_file) and (file.endswith(".wav") or file.endswith(".ogg")):                
+                for vowel in vowels:
+                    if(re.match(f".*_{vowel}\.wav", file)):
+                        files.append(full_file)
+
+
+    return files
 
 
 # calling daaset.py <root_path> sets / caches the VocalSet root path in build/vocalset.json
