@@ -1,8 +1,10 @@
 
 import numpy as np
 import json
+import os
 
 from tools import audio_io
+
 
 # TODO implement feature to write to a framed audio in addition to reading frames from it?
 
@@ -135,7 +137,7 @@ class FramedAudio:
 
         return all_match
 
-    def save_json(self, json_file):
+    def save_json(self, json_file=None):
 
         data = {}
 
@@ -150,6 +152,9 @@ class FramedAudio:
         data['data'] = {}
         for key in self.trajectories:
             data['data'][key] = self.trajectories[key].tolist()
+
+        if(json_file == None):
+            json_file = os.path.splitext(self.src_file)[0] + '.json'
 
         # write
         with open(json_file, 'w+') as outfile:
