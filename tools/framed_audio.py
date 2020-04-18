@@ -63,6 +63,10 @@ class FramedAudio:
         return  1 + max(0,int(np.floor(self.array.size - self.block_size - offset)/self.hop_size))
 
 
+    # returns number of samples
+    def get_num_samples(self):
+        return self.array.size
+
     # returns a time vector for each frame
     # with centered=True, get_time return the time at the center of each frame.
     def get_time(self, centered=True):

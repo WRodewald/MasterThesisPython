@@ -2,14 +2,8 @@
 import tensorflow as tf
 import numpy as np
 
+from model import util
 
-def linearScale(x, x_min, x_max, y_min, y_max):
-    normalized = (x - x_min) / (x_max - x_min)
-
-    return normalized * (y_max - y_min) + y_min
-
-def db2mag(x):
-    return tf.math.pow(10., x * 0.05)
 
 class ZPKToMagLayer(tf.keras.layers.Layer):
     """Converts pole - zero - gain parameters to a magnitude response """
@@ -45,13 +39,16 @@ class ZPKToMagLayer(tf.keras.layers.Layer):
         zw = zpk[:,3:length+1:4]
         zr = zpk[:,4:length+1:4]
 
+        zw = 0.5 * tf.sigmoid(zw)
+        pw = 0.5 * tf.sigmoid(pw)
+
         # parameter shaping
         pr = tf.sigmoid(pr)
         zr = tf.sigmoid(zr)
         k  = tf.sigmoid(k)
-        k   = db2mag(linearScale(k, 0, 1, -100, +50))
-        pr  = 1. - 1. / db2mag(linearScale(pr, -1, 1,  0, 60))
-        zr  = 1. - 1. / db2mag(linearScale(zr, -1, 1,  0, 60))
+        k   = util.db2mag(util.lin_scale(k, 0, 1, -100, 0))
+        pr  = 1. - 1. / util.db2mag(util.lin_scale(pr, 0, 1,  0, 80))
+        zr  = 1. - 1. / util.db2mag(util.lin_scale(zr, 0, 1,  0, 80))
         
         pi = tf.constant(np.pi);
 
@@ -85,7 +82,7 @@ class ZPKToMagLayer(tf.keras.layers.Layer):
         # calculate transfer function
         H = tf.complex(k, 0.) * tf.reduce_prod(Hff / Hfb, 1)
 
-        return H
+        return H, z0, p0, k
 
     def call(self, inputs):
         if not isinstance(inputs, list):

@@ -32,7 +32,8 @@ class test_NormalizeLayer(unittest.TestCase):
 
         w0 = tf.reshape(w0, [1, w0.shape[0]])
         
-        H = layer.response(z, p, k, w0)
+        H, _, _, _ = layer.response(z, p, k, w0)
+
         H = tf.abs(H)
 
         self.assertAlmostEqual(H.numpy()[0,0], 25.598, delta=0.01)

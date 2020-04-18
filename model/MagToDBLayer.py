@@ -3,6 +3,8 @@ import tensorflow as tf
 import numpy as np
 import math
 
+from model import util
+
 class MagToDBLayer(tf.keras.layers.Layer):
     """Converts magnitudes to decibel"""
 
@@ -15,6 +17,4 @@ class MagToDBLayer(tf.keras.layers.Layer):
         super(MagToDBLayer, self).build(input_shape)
 
     def call(self, input):
-
-        factor = tf.constant(20 / math.log(10))
-        return tf.multiply(factor, tf.math.log(tf.abs(input)))
+        return util.mag2db(input)

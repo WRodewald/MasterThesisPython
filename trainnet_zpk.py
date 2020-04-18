@@ -7,8 +7,12 @@ from __future__ import print_function
 
 #%reset
 
+%load_ext autoreload
+%autoreload 2
+
 import os
 #os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
 import math
 import functools
 import numpy as np
@@ -22,8 +26,13 @@ from model import MagToDBLayer, ZPKToMagLayer, NormalizeLayer
 from datetime import datetime
 from packaging import version
 
+import scipy.io as sio
+
 import tensorflow as tf
 from tensorflow import keras
+
+from tools.framed_audio import FramedAudio
+from tools import extract_overtones, magnitude, dataset
 
 config = tf.compat.v1.ConfigProto()
 config.gpu_options.allow_growth = True
@@ -33,23 +42,50 @@ session = tf.compat.v1.Session(config=config)
 
 print('Import Dataset')
 
-dataset = "data/data.csv"
+if(False):
+    dataset_csv = "data/data.csv"
+    data = pd.read_csv(dataset_csv, sep=";")
 
-data = pd.read_csv(dataset, sep=";")
+    predictor = data.iloc[:,(0)]
+    response  = data.iloc[:,1:41]
+    predictor = predictor.to_numpy()
+    response  = response.to_numpy()
 
-predictor = data.iloc[:,(0)]
-response  = data.iloc[:,1:41]
-predictor = predictor.to_numpy()
-response  = response.to_numpy()
+    predictor = predictor[:,None]
 
-predictor = predictor[:,None]
+    # manual normalization
+    predictor_mean = np.mean(predictor)
+    predictor_std  = np.std(predictor)
 
-# manual normalization
-predictor_mean = np.mean(predictor)
-predictor_std  = np.std(predictor)
+    num_samples = response.shape[0]
+    sample_rate = 44100
 
-num_samples = response.shape[0]
-sample_rate = 44100
+
+if(True):
+    # get cached analysis result and source sample
+    num_overtones = 40
+    
+    wav_file  = dataset.get_sample('scales', 'slow_forte', 'a', 'f1')[0]
+    json_file =  os.path.splitext(wav_file)[0] + '.json'
+
+    audio = FramedAudio.from_json(json_file)
+
+    onset, offset = magnitude.get_onset_offset(audio)
+    sample_rate = audio.fs
+    num_samples = offset - onset
+
+    overtones = extract_overtones.extract_overtones_from_audio(audio, num_overtones = num_overtones)
+    overtones = 20 * np.log10(np.abs(overtones))
+    overtones = overtones[onset:offset, :]
+    pitch = np.reshape(audio.get_trajectory('pitch')[onset:offset], [num_samples,1])
+
+    predictor = pitch
+    response  = overtones
+
+    predictor_mean = np.mean(predictor)
+    predictor_std  = np.std(predictor)
+
+
 
 def split_train_test_eval_indices(num_samples, train_split, val_split, test_split):
 
@@ -75,14 +111,17 @@ print('Build Model')
 inputs = keras.Input(shape=(1,), name='input')
 x = inputs
 x = NormalizeLayer.NormalizeLayer(predictor_mean, predictor_std, name='normalize')(x)
-x = tf.keras.layers.Dense(128,  activation='sigmoid', name='dense_1')(x)
-x = tf.keras.layers.Dense(41,  name='dense_2')(x)
-x = ZPKToMagLayer.ZPKToMagLayer(sample_rate, 40, name='zpk')([x,inputs])
+x = tf.keras.layers.Dense(128,  activation='sigmoid')(x)
+x = tf.keras.layers.Dense(128,  activation='sigmoid')(x)
+x = tf.keras.layers.Dense(128,  activation='sigmoid')(x)
+x = tf.keras.layers.Dense(128,  activation='sigmoid')(x)
+x = tf.keras.layers.Dense(41)(x)
+x, _, _, _ = ZPKToMagLayer.ZPKToMagLayer(sample_rate, 40, name='zpk')([x,inputs])
 x = MagToDBLayer.MagToDBLayer(name='mag2db')(x)
-model = keras.Model(inputs=inputs, outputs=x)
+model = keras.Model(inputs=inputs, outputs=[x])
   
 # compile
-model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.5*10E-4),
+model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=10E-5),
     loss=keras.losses.mean_squared_error,
     metrics=[])
 
@@ -114,7 +153,31 @@ model.fit(x=predictor[train_idx,:], y=response[train_idx,:], epochs = 2000,
 
 
 #%%
-model.save('temp/zpk_model') 
+#model.save('temp/zpk_model') 
+
+sweep = np.linspace(np.min(predictor), np.max(predictor), 1000)
+sweep_out = model.predict(sweep)
+
+np.savetxt("out.csv", sweep_out)
+
+
+# create new model, skipping unnecessary prediction 
+zpk_output, z0_out, p0_out, k_out = model.get_layer('zpk').output
+zpk_model = tf.keras.models.Model(inputs=model.input, outputs=[z0_out, p0_out, k_out])
+
+[z0, p0, k] = zpk_model.predict(predictor)
+
+
+# store as .mat file to further analyse in matlab
+
+sio.savemat('out.mat', {
+    'f':predictor, 
+    'z0':z0, 
+    'p0': p0, 
+    'k':k,
+    'pred':predictor,
+    'resp':response})
+
 
           
 #%% predict data and plot
@@ -132,33 +195,10 @@ print(f' Train Error:      {error_train:.2f}')
 
 
 
-
 # %%
 
 
 plt.plot(predicted[500,:])
 plt.plot(response[500,:])
 plt.show()
-
-
-# %%
-layer_output = model.get_layer('dense_2').output
-
-intermediate_model = tf.keras.models.Model(inputs=model.input,outputs=layer_output)
- 
-zpk_params = intermediate_model.predict(predictor)
-
-num_instances = zpk_params.shape[0]
-num_bins = 2000
-f0 = 4.
-layer = ZPKToMagLayer.ZPKToMagLayer(sample_rate, num_bins)
-
-f = tf.tile(tf.reshape(f0, [1,1]), [num_instances, 1])
-
-# skip some frames
-
-#for i in range(0, num_instances):
-#    print(i)
-#    response = layer.call([tf.slice(zpk_params, [i,0],[1,-1]), tf.slice(f, [i,0],[1,-1])])
-#    response = MagToDBLayer.MagToDBLayer().call(response)
 

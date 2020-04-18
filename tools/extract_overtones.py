@@ -1,6 +1,7 @@
 import numpy as np
 from tools.framed_audio import FramedAudio
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 # this function extracts some overtones
 def extract_ovetones(frame, pitch, pitch_inc, fs, num_overtones = 10, resynthesize = True):
@@ -26,6 +27,24 @@ def extract_ovetones(frame, pitch, pitch_inc, fs, num_overtones = 10, resynthesi
     else:
         return overtones
 
+def extract_overtones_from_audio(audio, pitch = None, pitch_inc = None, num_overtones = 40):
+    
+    if(pitch == None): 
+        pitch = audio.get_trajectory('pitch')
+
+    if(pitch_inc == None): 
+        pitch_inc = audio.get_trajectory('pitch-inc')
+
+    window = np.hanning(audio.block_size)
+    overtones = np.zeros([audio.get_num_frames(), num_overtones])
+
+    print('Extracting overtones ...')
+    for i in tqdm(range(audio.get_num_frames())):
+        frame = audio.get_frame(i) * window
+
+        overtones[i,:]  = extract_ovetones(frame, pitch[i], pitch_inc[i], audio.fs, num_overtones, False)
+
+    return overtones
 
 
 
