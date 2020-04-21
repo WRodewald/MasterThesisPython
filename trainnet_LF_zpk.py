@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 
 from time import time
 
-from model import MagToDBLayer, ZPKToMagLayer, NormalizeLayer 
+from model import MagToDBLayer, ZPKToMagLayer, NormalizeLayer, LFRdToDBLayer, util
 
 from datetime import datetime
 from packaging import version
@@ -42,7 +42,7 @@ session = tf.compat.v1.Session(config=config)
 
 print('Import Dataset')
 
-if(False):
+if(True):
     dataset_csv = "data/data.csv"
     data = pd.read_csv(dataset_csv, sep=";")
 
@@ -61,7 +61,7 @@ if(False):
     sample_rate = 44100
 
 
-if(True):
+if(False):
     # get cached analysis result and source sample
     num_overtones = 40
     
@@ -115,9 +115,28 @@ x = tf.keras.layers.Dense(128,  activation='sigmoid')(x)
 x = tf.keras.layers.Dense(128,  activation='sigmoid')(x)
 x = tf.keras.layers.Dense(128,  activation='sigmoid')(x)
 x = tf.keras.layers.Dense(128,  activation='sigmoid')(x)
-x = tf.keras.layers.Dense(41)(x)
-x, _, _, _ = ZPKToMagLayer.ZPKToMagLayer(sample_rate, 40, name='zpk')([x,inputs])
-x = MagToDBLayer.MagToDBLayer(name='mag2db')(x)
+x = tf.keras.layers.Dense(42)(x)
+
+# split in LF-Rd and zpk branch
+def split_layers(input): 
+    return tf.expand_dims(input[:,0],1), input[:, 1:]
+
+x_Rd, x_zpk = tf.keras.layers.Lambda(split_layers)(x)
+print(x_Rd)
+print(x_zpk)
+# LF-Rd branch
+def scale_Rd(input): 
+    return util.lin_scale(tf.sigmoid(input), 0., 1., 0.3, 2.7)
+x_Rd = tf.keras.layers.Lambda(scale_Rd)(x_Rd)
+x_Rd = LFRdToDBLayer.LFRdToDBLayer(40)(x_Rd)
+
+# Vocal tract branch
+x_zpk, _, _, _ = ZPKToMagLayer.ZPKToMagLayer(sample_rate, 40, name='zpk')([x_zpk,inputs])
+x_zpk = MagToDBLayer.MagToDBLayer(name='mag2db')(x_zpk)
+
+# sum branch decibel magnitude responses 
+x = tf.keras.layers.Add()([x_Rd, x_zpk])
+
 model = keras.Model(inputs=inputs, outputs=[x])
   
 # compile
@@ -202,3 +221,6 @@ plt.plot(predicted[500,:])
 plt.plot(response[500,:])
 plt.show()
 
+
+
+# %%

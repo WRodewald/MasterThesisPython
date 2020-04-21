@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 
 from time import time
 
-from model import MagToDBLayer, ZPKToMagLayer, NormalizeLayer 
+from model import MagToDBLayer, ZPKToMagLayer, NormalizeLayer, LFRdToDBLayer, util, VarianceLayer
 
 from datetime import datetime
 from packaging import version
@@ -42,7 +42,7 @@ session = tf.compat.v1.Session(config=config)
 
 print('Import Dataset')
 
-if(False):
+if(True):
     dataset_csv = "data/data.csv"
     data = pd.read_csv(dataset_csv, sep=";")
 
@@ -50,8 +50,11 @@ if(False):
     response  = data.iloc[:,1:41]
     predictor = predictor.to_numpy()
     response  = response.to_numpy()
-
+    
     predictor = predictor[:,None]
+        
+    predictor = predictor[0:9000,:]
+    response  = response[0:9000,:]
 
     # manual normalization
     predictor_mean = np.mean(predictor)
@@ -61,7 +64,7 @@ if(False):
     sample_rate = 44100
 
 
-if(True):
+if(False):
     # get cached analysis result and source sample
     num_overtones = 40
     
@@ -86,25 +89,6 @@ if(True):
     predictor_std  = np.std(predictor)
 
 
-
-def split_train_test_eval_indices(num_samples, train_split, val_split, test_split):
-
-    num_train = np.floor(train_split * num_samples).astype(int)
-    num_val   = np.floor(val_split   * num_samples).astype(int)
-    num_test  = np.floor(test_split  * num_samples).astype(int)
-
-    pool = np.arange(0, num_samples)
-    train_indices = pool[np.random.choice(pool.size, num_train)]
-    
-    pool = np.setdiff1d(pool, train_indices)
-    val_indices = pool[np.random.choice(pool.size, num_val)]
-
-    pool = np.setdiff1d(pool, val_indices)
-    test_indices = pool[np.random.choice(pool.size, max(pool.size, num_test))]
-
-    return train_indices, val_indices, test_indices
-
-
 #%% Build Model
 print('Build Model')
 
@@ -115,29 +99,38 @@ x = tf.keras.layers.Dense(128,  activation='sigmoid')(x)
 x = tf.keras.layers.Dense(128,  activation='sigmoid')(x)
 x = tf.keras.layers.Dense(128,  activation='sigmoid')(x)
 x = tf.keras.layers.Dense(128,  activation='sigmoid')(x)
-x = tf.keras.layers.Dense(41)(x)
-x, _, _, _ = ZPKToMagLayer.ZPKToMagLayer(sample_rate, 40, name='zpk')([x,inputs])
-x = MagToDBLayer.MagToDBLayer(name='mag2db')(x)
+x = tf.keras.layers.Dense(42)(x)
+
+# split in LF-Rd and zpk branch
+def split_layers(input): 
+    return tf.expand_dims(input[:,0],1), input[:, 1:]
+
+x_Rd, x_zpk = tf.keras.layers.Lambda(split_layers)(x)
+# LF-Rd branch
+def scale_Rd(input): 
+    return util.lin_scale(tf.sigmoid(input), 0., 1., 0.3, 2.7)
+
+x_Rd = tf.keras.layers.Lambda(scale_Rd, name="Rd")(x_Rd)
+x_Rd = LFRdToDBLayer.LFRdToDBLayer(40, name="RdOut")(x_Rd)
+
+# Vocal tract branch
+var_layer = VarianceLayer.VarianceLayer(predictor.shape[0])
+x_zpk = var_layer(x_zpk)
+x_zpk, _, _, _ = ZPKToMagLayer.ZPKToMagLayer(sample_rate, 40, name='zpk')([x_zpk,inputs])
+x_zpk = MagToDBLayer.MagToDBLayer(name='mag2db')(x_zpk)
+
+# sum branch decibel magnitude responses 
+x = tf.keras.layers.Add()([x_Rd, x_zpk])
+
 model = keras.Model(inputs=inputs, outputs=[x])
   
-# compile
-model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=10E-5),
+
+#%% compile model
+model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=10E-4),
     loss=keras.losses.mean_squared_error,
     metrics=[])
 
 model.summary()
-
-
-
-#%% randomize test /split
-
-# fit / train split
-train_split  = 0.7;
-test_split   = 0.15;
-val_split    = 0.15;
-
-train_idx, val_idx, test_idx = split_train_test_eval_indices(num_samples, train_split, val_split, test_split)
-
 
 
 #%% train network
@@ -146,36 +139,35 @@ print('Train Model')
 logs = "logs\\" + datetime.now().strftime("%Y%m%d-%H%M%S")
 tboard_callback = tf.keras.callbacks.TensorBoard(log_dir = logs, histogram_freq = 1)
 
-model.fit(x=predictor[train_idx,:], y=response[train_idx,:], epochs = 2000, 
+model.fit(x=predictor, y=response, 
+          shuffle=False,
+          epochs = 2000, 
           batch_size=40000,
-          validation_data=(predictor[val_idx,:], response[val_idx,:]),
           callbacks=[])
 
 
 #%%
-#model.save('temp/zpk_model') 
-
-sweep = np.linspace(np.min(predictor), np.max(predictor), 1000)
-sweep_out = model.predict(sweep)
-
-np.savetxt("out.csv", sweep_out)
-
 
 # create new model, skipping unnecessary prediction 
 zpk_output, z0_out, p0_out, k_out = model.get_layer('zpk').output
-zpk_model = tf.keras.models.Model(inputs=model.input, outputs=[z0_out, p0_out, k_out])
+RdOut_out = model.get_layer('RdOut').output
+Rd_out = model.get_layer('Rd').output
+zpk_model = tf.keras.models.Model(inputs=model.input, outputs=[z0_out, p0_out, k_out, Rd_out, RdOut_out])
 
-[z0, p0, k] = zpk_model.predict(predictor)
+[z0_pred, p0_pred, k_pred, Rd_pred, RdOut_pred] = zpk_model.predict(predictor, batch_size=40000)
 
 
 # store as .mat file to further analyse in matlab
 
 sio.savemat('out.mat', {
-    'f':predictor, 
-    'z0':z0, 
-    'p0': p0, 
-    'k':k,
+    'f':predictor,
+    'Rd':Rd_pred,
+    'RdOut':RdOut_pred,
+    'z0':z0_pred, 
+    'p0': p0_pred, 
+    'k':k_pred,
     'pred':predictor,
+    #'var':var_layer.variance.numpy(),
     'resp':response})
 
 
@@ -183,22 +175,21 @@ sio.savemat('out.mat', {
 #%% predict data and plot
 print("Log Results")
 
-predicted = model.predict(predictor)
+predicted = model.predict(predictor, batch_size=40000)
 
-error_test  = np.mean(np.mean(np.abs(predicted[train_idx,:] - response[train_idx,:])))
-error_val   = np.mean(np.mean(np.abs(predicted[val_idx,:]   - response[val_idx,:])))
-error_train = np.mean(np.mean(np.abs(predicted[test_idx,:]  - response[test_idx,:])))
+error_test  = np.mean(np.mean(np.abs(predicted - response)))
 
 print(f' Test  Error:      {error_test:.2f}')
-print(f' Validation Error: {error_val:.2f}')
-print(f' Train Error:      {error_train:.2f}')
 
 
 
 # %%
 
 
-plt.plot(predicted[500,:])
-plt.plot(response[500,:])
+plt.plot(predicted[800,:])
+plt.plot(response[800,:])
 plt.show()
 
+
+
+# %%
