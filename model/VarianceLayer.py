@@ -3,11 +3,12 @@ import tensorflow as tf
 
 class VarianceLayer(tf.keras.layers.Layer):
 
-    def __init__(self, num_samples, **kwargs):
+    def __init__(self, num_samples, weight = 1, **kwargs):
         super(VarianceLayer, self).__init__(**kwargs)
 
         # store number of samples in dataset to allocate the trainable matrix later on
         self.num_samples = num_samples
+        self.weight = weight
 
     def build(self, input_shape):
         super(VarianceLayer, self).build(input_shape)
@@ -18,7 +19,7 @@ class VarianceLayer(tf.keras.layers.Layer):
 
     def call(self, input):
         
-        self.add_loss(100000 * tf.square(self.variance)) # add weighted loss from variance
+        self.add_loss(self.weight * tf.reduce_mean(tf.square(self.variance))) # add weighted loss from variance
         return input + self.variance
 
 

@@ -33,11 +33,27 @@ class ZPKToMagLayer(tf.keras.layers.Layer):
 
         length = zpk.shape[1]
 
-        k  = zpk[:,0]
-        pw = zpk[:,1:length+1:4]
-        pr = zpk[:,2:length+1:4]
-        zw = zpk[:,3:length+1:4]
-        zr = zpk[:,4:length+1:4]
+        if(length % 4 == 0):
+            # 4*N parameters, we assume konstant k = 1            
+            pw = zpk[:,0:length+1:4]
+            pr = zpk[:,1:length+1:4]
+            zw = zpk[:,2:length+1:4]
+            zr = zpk[:,3:length+1:4]
+
+            k = tf.ones_like(zpk[:,0])
+
+        else:
+            # 4*N+1 parameters, we have a specific k
+            k  = zpk[:,0]
+            pw = zpk[:,1:length+1:4]
+            pr = zpk[:,2:length+1:4]
+            zw = zpk[:,3:length+1:4]
+            zr = zpk[:,4:length+1:4]
+                
+            k  = tf.sigmoid(k)
+            k   = util.db2mag(util.lin_scale(k, 0, 1, -100, 0))
+
+
 
         zw = 0.5 * tf.sigmoid(zw)
         pw = 0.5 * tf.sigmoid(pw)
@@ -45,10 +61,8 @@ class ZPKToMagLayer(tf.keras.layers.Layer):
         # parameter shaping
         pr = tf.sigmoid(pr)
         zr = tf.sigmoid(zr)
-        k  = tf.sigmoid(k)
-        k   = util.db2mag(util.lin_scale(k, 0, 1, -100, 0))
-        pr  = 1. - 1. / util.db2mag(util.lin_scale(pr, 0, 1,  0, 80))
-        zr  = 1. - 1. / util.db2mag(util.lin_scale(zr, 0, 1,  0, 80))
+        pr  = 1. - 1. / util.db2mag(util.lin_scale(pr, 0, 1,  0, 60))
+        zr  = 1. - 1. / util.db2mag(util.lin_scale(zr, 0, 1,  0, 60))
         
         pi = tf.constant(np.pi);
 

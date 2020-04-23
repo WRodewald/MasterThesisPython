@@ -22,6 +22,7 @@ import matplotlib.pyplot as plt
 from time import time
 
 from model import MagToDBLayer, ZPKToMagLayer, NormalizeLayer, LFRdToDBLayer, util, VarianceLayer
+from model import SliceLayer
 
 from datetime import datetime
 from packaging import version
@@ -88,6 +89,7 @@ if(False):
     predictor_mean = np.mean(predictor)
     predictor_std  = np.std(predictor)
 
+num_overtones = 40
 
 #%% Build Model
 print('Build Model')
@@ -99,35 +101,49 @@ x = tf.keras.layers.Dense(128,  activation='sigmoid')(x)
 x = tf.keras.layers.Dense(128,  activation='sigmoid')(x)
 x = tf.keras.layers.Dense(128,  activation='sigmoid')(x)
 x = tf.keras.layers.Dense(128,  activation='sigmoid')(x)
-x = tf.keras.layers.Dense(42)(x)
+x = tf.keras.layers.Dense(40+2)(x)
 
 # split in LF-Rd and zpk branch
-def split_layers(input): 
-    return tf.expand_dims(input[:,0],1), input[:, 1:]
+x_Rd, x_gain, x_zpk = SliceLayer.SliceLayer([[0,1], [1,2], [2,62]])(x)
 
-x_Rd, x_zpk = tf.keras.layers.Lambda(split_layers)(x)
 # LF-Rd branch
 def scale_Rd(input): 
     return util.lin_scale(tf.sigmoid(input), 0., 1., 0.3, 2.7)
-
+    
 x_Rd = tf.keras.layers.Lambda(scale_Rd, name="Rd")(x_Rd)
-x_Rd = LFRdToDBLayer.LFRdToDBLayer(40, name="RdOut")(x_Rd)
+x_Rd = LFRdToDBLayer.LFRdToDBLayer(num_overtones, name="RdOut")(x_Rd)
+
+def spectral_tilt(input): 
+    ot = tf.reshape(tf.range(1., num_overtones+1.), shape=[1, num_overtones])
+    return input + 6. * util.log2(ot)
+#x_Rd = tf.keras.layers.Lambda(spectral_tilt)(x_Rd)
+
+
+# gain branch as lamba layer
+x_gain = tf.keras.layers.Lambda(lambda x: util.lin_scale(x, 0., 1., -100, 0), name="gain")(x_gain)
+#gain_variance = VarianceLayer.VarianceLayer(predictor.shape[0], 0.1)
+#x_gain = gain_variance(x_gain)
+x_gain = tf.keras.layers.Lambda(lambda x: tf.tile(x, [1, num_overtones]))(x_gain)
 
 # Vocal tract branch
-var_layer = VarianceLayer.VarianceLayer(predictor.shape[0])
-x_zpk = var_layer(x_zpk)
-x_zpk, _, _, _ = ZPKToMagLayer.ZPKToMagLayer(sample_rate, 40, name='zpk')([x_zpk,inputs])
+zpk_variance = VarianceLayer.VarianceLayer(predictor.shape[0], 10000)
+x_zpk = zpk_variance(x_zpk)
+x_zpk, _, _, k = ZPKToMagLayer.ZPKToMagLayer(sample_rate, num_overtones, name='zpk')([x_zpk,inputs])
 x_zpk = MagToDBLayer.MagToDBLayer(name='mag2db')(x_zpk)
 
 # sum branch decibel magnitude responses 
-x = tf.keras.layers.Add()([x_Rd, x_zpk])
+x = tf.keras.layers.Add()([x_Rd, x_zpk, x_gain])
+
 
 model = keras.Model(inputs=inputs, outputs=[x])
   
 
 #%% compile model
-model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=10E-4),
-    loss=keras.losses.mean_squared_error,
+
+mse_weights = np.reshape(np.linspace(1., 1, num_overtones), [1,num_overtones])
+mse_weights[0,1:10] = 1.
+model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=10E-5),
+    loss= lambda y_true, y_pred: util.weighted_mse_loss(y_true, y_pred, mse_weights),
     metrics=[])
 
 model.summary()
@@ -151,23 +167,25 @@ model.fit(x=predictor, y=response,
 # create new model, skipping unnecessary prediction 
 zpk_output, z0_out, p0_out, k_out = model.get_layer('zpk').output
 RdOut_out = model.get_layer('RdOut').output
-Rd_out = model.get_layer('Rd').output
-zpk_model = tf.keras.models.Model(inputs=model.input, outputs=[z0_out, p0_out, k_out, Rd_out, RdOut_out])
+Rd_out    = model.get_layer('Rd').output
+gain_out  = model.get_layer('gain').output
+zpk_model = tf.keras.models.Model(inputs=model.input, outputs=[z0_out, p0_out, k_out, Rd_out, RdOut_out, gain_out])
 
-[z0_pred, p0_pred, k_pred, Rd_pred, RdOut_pred] = zpk_model.predict(predictor, batch_size=40000)
+[z0_pred, p0_pred, k_pred, Rd_pred, RdOut_pred, g_pred] = zpk_model.predict(predictor, batch_size=40000)
 
 
 # store as .mat file to further analyse in matlab
 
 sio.savemat('out.mat', {
     'f':predictor,
+    'g':g_pred,
     'Rd':Rd_pred,
     'RdOut':RdOut_pred,
     'z0':z0_pred, 
     'p0': p0_pred, 
     'k':k_pred,
     'pred':predictor,
-    #'var':var_layer.variance.numpy(),
+    #'var':zpk_variance.variance.numpy(),
     'resp':response})
 
 
