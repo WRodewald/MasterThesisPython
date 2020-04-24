@@ -54,9 +54,9 @@ class ZPKToMagLayer(tf.keras.layers.Layer):
             k   = util.db2mag(util.lin_scale(k, 0, 1, -100, 0))
 
 
-
-        zw = 0.5 * tf.sigmoid(zw)
-        pw = 0.5 * tf.sigmoid(pw)
+        max_f = tf.constant(8000./self.sample_rate)
+        zw = max_f * tf.sigmoid(zw)
+        pw = max_f * tf.sigmoid(pw)
 
         # parameter shaping
         pr = tf.sigmoid(pr)
@@ -64,13 +64,12 @@ class ZPKToMagLayer(tf.keras.layers.Layer):
         pr  = 1. - 1. / util.db2mag(util.lin_scale(pr, 0, 1,  0, 60))
         zr  = 1. - 1. / util.db2mag(util.lin_scale(zr, 0, 1,  0, 60))
         
-        pi = tf.constant(np.pi);
 
         #p0 = pr * tf.exp(tf.complex(0., pw * pi))
         #z0 = zr * tf.exp(tf.complex(0., zw * pi))
 
-        p0 = tf.multiply(tf.complex(pr,0.), tf.complex(tf.math.cos(pw * pi), tf.math.sin(pw * pi)), name="p0")
-        z0 = tf.multiply(tf.complex(zr,0.), tf.complex(tf.math.cos(zw * pi), tf.math.sin(zw * pi)), name="z0")
+        p0 = tf.multiply(tf.complex(pr,0.), tf.complex(tf.math.cos(pw * 2 * np.pi), tf.math.sin(pw *  2 * np.pi)), name="p0")
+        z0 = tf.multiply(tf.complex(zr,0.), tf.complex(tf.math.cos(zw * 2 * np.pi), tf.math.sin(zw *  2 * np.pi)), name="z0")
 
         return z0, p0, k
 

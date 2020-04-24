@@ -23,6 +23,8 @@ from time import time
 
 from model import MagToDBLayer, ZPKToMagLayer, NormalizeLayer, LFRdToDBLayer, util, VarianceLayer
 from model import SliceLayer
+from model import TemporalVarianceLayer
+from model import ParameterLayer
 
 from datetime import datetime
 from packaging import version
@@ -61,10 +63,6 @@ if(True):
     predictor_mean = np.mean(predictor)
     predictor_std  = np.std(predictor)
 
-    #time =  tf.linspace(np.min(predictor), np.max(predictor), len(predictor))
-    #time = time[:,None]
-    #predictor = tf.concat([predictor,time],axis=1)
-
     num_samples = response.shape[0]
     sample_rate = 44100
 
@@ -86,7 +84,7 @@ if(False):
     overtones = 20 * np.log10(np.abs(overtones))
     overtones = overtones[onset:offset, :]
     pitch = np.reshape(audio.get_trajectory('pitch')[onset:offset], [num_samples,1])
-    time = tf.linspace(0., 1., len(pitch))
+
     predictor = pitch
     response  = overtones
 
@@ -94,21 +92,26 @@ if(False):
     predictor_std  = np.std(predictor)
 
 num_overtones = 40
+num_samples   = predictor.shape[0]
 
 #%% Build Model
 print('Build Model')
 
 inputs = keras.Input(shape=(1,), name='input')
-x = inputs
-x = NormalizeLayer.NormalizeLayer(predictor_mean, predictor_std, name='normalize')(x)
-x = tf.keras.layers.Dense(128,  activation='sigmoid')(x)
-x = tf.keras.layers.Dense(128,  activation='sigmoid')(x)
-x = tf.keras.layers.Dense(128,  activation='sigmoid')(x)
-x = tf.keras.layers.Dense(128,  activation='sigmoid')(x)
-x = tf.keras.layers.Dense(40+2)(x)
+
+parameter_layer = ParameterLayer.ParameterLayer(num_samples, 42)
+x = parameter_layer(inputs)
+
 
 # split in LF-Rd and zpk branch
 x_Rd, x_gain, x_zpk = SliceLayer.SliceLayer([[0,1], [1,2], [2,62]])(x)
+
+zpk_var  = TemporalVarianceLayer.TemporalVarianceLayer(num_samples = num_samples, weight=10E6) 
+Rd_var   = TemporalVarianceLayer.TemporalVarianceLayer(num_samples = num_samples, weight=10E6) 
+gain_var = TemporalVarianceLayer.TemporalVarianceLayer(num_samples = num_samples, weight=10E6) 
+x_zpk   = zpk_var(x_zpk)
+x_Rd    = Rd_var(x_Rd)
+x_gain  = gain_var(x_gain)
 
 # LF-Rd branch
 def scale_Rd(input): 
@@ -117,21 +120,11 @@ def scale_Rd(input):
 x_Rd = tf.keras.layers.Lambda(scale_Rd, name="Rd")(x_Rd)
 x_Rd = LFRdToDBLayer.LFRdToDBLayer(num_overtones, name="RdOut")(x_Rd)
 
-def spectral_tilt(input): 
-    ot = tf.reshape(tf.range(1., num_overtones+1.), shape=[1, num_overtones])
-    return input + 6. * util.log2(ot)
-#x_Rd = tf.keras.layers.Lambda(spectral_tilt)(x_Rd)
-
-
 # gain branch as lamba layer
 x_gain = tf.keras.layers.Lambda(lambda x: util.lin_scale(x, 0., 1., -100, 0), name="gain")(x_gain)
-#gain_variance = VarianceLayer.VarianceLayer(predictor.shape[0], 0.1)
-#x_gain = gain_variance(x_gain)
 x_gain = tf.keras.layers.Lambda(lambda x: tf.tile(x, [1, num_overtones]))(x_gain)
 
 # Vocal tract branch
-zpk_variance = VarianceLayer.VarianceLayer(predictor.shape[0], 10000)
-#x_zpk = zpk_variance(x_zpk)
 x_zpk, _, _, k = ZPKToMagLayer.ZPKToMagLayer(sample_rate, num_overtones, name='zpk')([x_zpk,inputs])
 x_zpk = MagToDBLayer.MagToDBLayer(name='mag2db')(x_zpk)
 
@@ -144,7 +137,11 @@ model = keras.Model(inputs=inputs, outputs=[x])
 
 #%% compile model
 
-mse_weights = np.reshape(np.linspace(1., 0.01, num_overtones), [1,num_overtones])
+gain_var.weight = 10E6
+zpk_var.weight  = 10E8
+Rd_var.weight   = 10E6
+
+mse_weights = np.reshape(np.linspace(1., 0, num_overtones), [1,num_overtones])
 mse_weights = mse_weights / np.average(mse_weights) 
 model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=10E-5),
     loss= lambda y_true, y_pred: util.weighted_mse_loss(y_true, y_pred, mse_weights),
@@ -153,19 +150,18 @@ model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=10E-5),
 model.summary()
 
 
+
 #%% train network
 print('Train Model')
 
 logs = "logs\\" + datetime.now().strftime("%Y%m%d-%H%M%S")
-#logs = "logs\\latest"
-tboard_callback = tf.keras.callbacks.TensorBoard(log_dir = logs, 
-    update_freq = 20)
+tboard_callback = tf.keras.callbacks.TensorBoard(log_dir = logs, histogram_freq = 1)
 
 model.fit(x=predictor, y=response, 
           shuffle=False,
-          epochs = 2000, 
+          epochs = 4000, 
           batch_size=40000,
-          callbacks=[tboard_callback])
+          callbacks=[])
 
 
 #%%

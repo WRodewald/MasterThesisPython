@@ -18,8 +18,9 @@ class VarianceLayer(tf.keras.layers.Layer):
         self.variance = tf.Variable(initial_value=tf.zeros((shape)))
 
     def call(self, input):
-        
-        self.add_loss(self.weight * tf.reduce_mean(tf.square(self.variance))) # add weighted loss from variance
+        loss = self.weight * tf.reduce_mean(tf.square(self.variance))
+        self.add_loss(loss) # add weighted loss from variance
+        self.add_metric(loss, aggregation='mean', name='var_loss')
         return input + self.variance
 
 
