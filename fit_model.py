@@ -67,11 +67,11 @@ if(True):
     sample_rate = 44100
 
 
-if(False):
+if(True):
     # get cached analysis result and source sample
     num_overtones = 40
     
-    wav_file  = dataset.get_sample('scales', 'slow_forte', 'a', 'f1')[0]
+    wav_file  = dataset.get_sample('scales', 'slow_forte', 'a', 'f6')[0]
     json_file =  os.path.splitext(wav_file)[0] + '.json'
 
     audio = FramedAudio.from_json(json_file)
@@ -81,12 +81,12 @@ if(False):
     num_samples = offset - onset
 
     overtones = extract_overtones.extract_overtones_from_audio(audio, num_overtones = num_overtones)
-    overtones = 20 * np.log10(np.abs(overtones))
-    overtones = overtones[onset:offset, :]
+    overtonesDB = 20. * np.log10(np.abs(overtones))
+    overtonesDB = overtonesDB[onset:offset, :]
     pitch = np.reshape(audio.get_trajectory('pitch')[onset:offset], [num_samples,1])
 
     predictor = pitch
-    response  = overtones
+    response  = overtonesDB
 
     predictor_mean = np.mean(predictor)
     predictor_std  = np.std(predictor)
@@ -106,9 +106,9 @@ x = parameter_layer(inputs)
 # split in LF-Rd and zpk branch
 x_Rd, x_gain, x_zpk = SliceLayer.SliceLayer([[0,1], [1,2], [2,62]])(x)
 
-zpk_var  = TemporalVarianceLayer.TemporalVarianceLayer(num_samples = num_samples, weight=10E6) 
-Rd_var   = TemporalVarianceLayer.TemporalVarianceLayer(num_samples = num_samples, weight=10E6) 
-gain_var = TemporalVarianceLayer.TemporalVarianceLayer(num_samples = num_samples, weight=10E6) 
+zpk_var  = TemporalVarianceLayer.TemporalVarianceLayer(num_samples = num_samples, weight=10E8) 
+Rd_var   = TemporalVarianceLayer.TemporalVarianceLayer(num_samples = num_samples, weight=10E8) 
+gain_var = TemporalVarianceLayer.TemporalVarianceLayer(num_samples = num_samples, weight=10E8) 
 x_zpk   = zpk_var(x_zpk)
 x_Rd    = Rd_var(x_Rd)
 x_gain  = gain_var(x_gain)
@@ -137,9 +137,9 @@ model = keras.Model(inputs=inputs, outputs=[x])
 
 #%% compile model
 
-gain_var.weight = 10E6
 zpk_var.weight  = 10E8
-Rd_var.weight   = 10E6
+gain_var.weight = 10E10
+Rd_var.weight   = 10E8
 
 mse_weights = np.reshape(np.linspace(1., 0, num_overtones), [1,num_overtones])
 mse_weights = mse_weights / np.average(mse_weights) 
@@ -163,9 +163,7 @@ model.fit(x=predictor, y=response,
           batch_size=40000,
           callbacks=[])
 
-
 #%%
-
 # create new model, skipping unnecessary prediction 
 zpk_output, z0_out, p0_out, k_out = model.get_layer('zpk').output
 RdOut_out = model.get_layer('RdOut').output
