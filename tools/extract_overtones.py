@@ -36,7 +36,7 @@ def extract_overtones_from_audio(audio, pitch = None, pitch_inc = None, num_over
         pitch_inc = audio.get_trajectory('pitch-inc')
 
     window = np.hanning(audio.block_size)
-    overtones = np.zeros([audio.get_num_frames(), num_overtones])
+    overtones = np.zeros([audio.get_num_frames(), num_overtones], dtype='complex128')
 
     print('Extracting overtones ...')
     for i in tqdm(range(audio.get_num_frames())):
