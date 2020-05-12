@@ -61,8 +61,8 @@ class ZPKToMagLayer(tf.keras.layers.Layer):
         # parameter shaping
         pr = tf.sigmoid(pr)
         zr = tf.sigmoid(zr)
-        pr  = 1. - 1. / util.db2mag(util.lin_scale(pr, 0, 1,  0, 60))
-        zr  = 1. - 1. / util.db2mag(util.lin_scale(zr, 0, 1,  0, 60))
+        pr  = 1. - 1. / util.db2mag(util.lin_scale(pr, 0, 1,  0, 90))
+        zr  = 1. - 1. / util.db2mag(util.lin_scale(zr, 0, 1,  0, 90))
         
 
         #p0 = pr * tf.exp(tf.complex(0., pw * pi))

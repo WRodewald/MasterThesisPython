@@ -17,4 +17,4 @@ class MagToDBLayer(tf.keras.layers.Layer):
         super(MagToDBLayer, self).build(input_shape)
 
     def call(self, input):
-        return util.mag2db(input)
+        return util.mag2db(tf.abs(input))

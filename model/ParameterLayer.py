@@ -3,13 +3,14 @@ import tensorflow as tf
 
 class ParameterLayer(tf.keras.layers.Layer):
 
-    def __init__(self, num_samples, num_parameters, is_static = True, **kwargs):
+    def __init__(self, num_samples, num_parameters, initial_value = 0., is_static = True, **kwargs):
         super(ParameterLayer, self).__init__(**kwargs)
 
         # store number of samples in dataset to allocate the trainable matrix later on
         self.num_samples = num_samples
         self.num_parameters = num_parameters
         self.is_static = is_static
+        self.initial_value = initial_value
 
     def build(self, input_shape):
         super(ParameterLayer, self).build(input_shape)
@@ -20,7 +21,7 @@ class ParameterLayer(tf.keras.layers.Layer):
         else:
             shape = tf.TensorShape([self.num_samples, self.num_parameters])
 
-        self.parameters = tf.Variable(initial_value=0.5 * tf.ones((shape)))
+        self.parameters = tf.Variable(initial_value = self.initial_value * tf.ones((shape)))
 
     def call(self, input):
         
