@@ -41,19 +41,19 @@ def approximate_epsilon(Rd):
 
         return (p1 * Rd * Rd + p2 * Rd + p3) / (Rd + q1)
 
-class LFRdToDBLayer(tf.keras.layers.Layer):
+class LFRdLayer(tf.keras.layers.Layer):
     """LF-Rd magnitude response using a 4th order bandpass respponse"""
 
 
     def __init__(self, output_size,  **kwargs):
-        super(LFRdToDBLayer, self).__init__(**kwargs)
+        super(LFRdLayer, self).__init__(**kwargs)
         self.output_size = output_size;
 
         self.k = tf.constant(tf.range(1,output_size+1, 1.), shape = [1, output_size])
 
 
     def build(self, input_shape):
-        super(LFRdToDBLayer, self).build(input_shape)
+        super(LFRdLayer, self).build(input_shape)
 
     def call(self, input):
         Rd = input
