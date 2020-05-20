@@ -106,18 +106,33 @@ losses = [lambda y_true, y_pred: util.weighted_mse_loss(y_true, y_pred, tf.squar
           lambda y_true, y_pred: util.pole_zero_loss(y_true, y_pred, r_weight, w_weight),
           lambda y_true, y_pred: util.pole_zero_loss(y_true, y_pred, r_weight, w_weight)]
 
-model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=10E-4),
+#%%
+model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=10E-5),
     loss=losses)
 
 model.summary()
 
 
-# %%
+#%% Training
+print('Training Model')
 
 model.fit(x=f0, y=[g, Rd, p0, z0], 
           epochs = 4000, 
           batch_size=20000,
           callbacks=[])
 
+#%% Plot predictions
+
+g_pred, Rd_pred, p0_pred, z0_pred = model.predict(f0, batch_size=20000)
+
+
+
+#%% Store Model
+print('Store Model')
+
+model_path = 'data/example/prediction_model'
+model.save(model_path)
+
+# %%
 
 
