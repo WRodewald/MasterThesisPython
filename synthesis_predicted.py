@@ -77,23 +77,28 @@ model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=10E-4),
 wav_file_s1  = dataset.get_sample('scales', 'slow_forte', 'a', 'f6')[0]
 json_file_s1 = os.path.splitext(wav_file_s1)[0] + '.json'
 audio_s1 = FramedAudio.from_json(json_file_s1)
+onset, offset = magnitude.get_onset_offset(audio_s1)
 
-pitch_s1 = audio_s1.get_trajectory('pitch')
+pitch_s1 = audio_s1.get_trajectory('pitch')[onset+50:offset-50]
 
 # load other singer
-wav_file_s2  = dataset.get_sample('scales', 'slow_forte', 'o', 'f6')[0]
+wav_file_s2  = dataset.get_sample('scales', 'slow_forte', 'o', 'f4')[0]
 json_file_s2 = os.path.splitext(wav_file_s2)[0] + '.json'
 audio_s2 = FramedAudio.from_json(json_file_s2)
+onset, offset = magnitude.get_onset_offset(audio_s2)
 
-pitch_s2 = audio_s2.get_trajectory('pitch')
+pitch_s2 = audio_s2.get_trajectory('pitch')[onset+50:offset-50]
 
 fs = 44100
 
 #%% Synthesis Parameter Prediction
 print('Predict Synthesis Parameters')
 
+
+
 f0 = pitch_s2
-g, Rd, p0, z0 = model.predict(f0, batch_size=40000)
+Rd = 0. * f0 + 2.0
+g, Rd, p0, z0 = model.predict([f0,Rd], batch_size=40000)
 
 # %% Prepare synthesis parameters (oversample, reshape)
 print('Prepare Synthesis Parameters')
@@ -129,7 +134,7 @@ audio *= util.db2mag(g_interpolator(t_audio)).numpy()
 audio = filter.tick_pz(audio, p0_interpolator(t_audio), z0_interpolator(t_audio))
 
 #%% so
-soundfile.write('data/example/audio/singer_alt_synthesis.wav', 0.707 * audio / np.max(np.abs(audio)), fs)
+soundfile.write('data/example/audio/singer_synthesis.wav', 0.707 * audio / np.max(np.abs(audio)), fs)
 
 
 

@@ -72,17 +72,15 @@ def to_complex(x):
     w = np.pi * tf.sigmoid(x[:,1::2]) # angle limited to [0..pi]
     return tf.complex(r, 0.) * tf.exp(tf.complex(0., w))
 
-inputs = keras.Input(shape=(1,), name='input')
-x = inputs
-x = tf.keras.layers.Lambda(lambda x: x/100.)(x)
-x = tf.keras.layers.Dense(1)(x)
-x = tf.keras.layers.Dense(8,   activation='sigmoid')(x)
-x = tf.keras.layers.Dense(16,  activation='sigmoid')(x)
-x = tf.keras.layers.Dense(32,  activation='sigmoid')(x)
-x = tf.keras.layers.Dense(62,  activation='sigmoid')(x)
-x = tf.keras.layers.Dense(62,  activation='sigmoid')(x)
-x = tf.keras.layers.Dense(62,  activation='sigmoid')(x)
-x = tf.keras.layers.Dense(62,  )(x)
+input_pitch = keras.Input(shape=(1,), name='input_pitch')
+pitch = tf.keras.layers.Lambda(lambda x: x/100.)(input_pitch)
+input_Rd = keras.Input(shape=(1,), name='input_Rd')
+inputs = tf.keras.layers.Concatenate(axis=1)([pitch, input_Rd])
+x = tf.keras.layers.Dense(2)(inputs)
+x = tf.keras.layers.Dense(8,   activation='softplus')(x)
+x = tf.keras.layers.Dense(32,  activation='softplus')(x)
+x = tf.keras.layers.Dense(62,  activation='softplus')(x)
+x = tf.keras.layers.Dense(62,)(x)
 
 x_gain, x_Rd, x_p0, x_z0 = SliceLayer.SliceLayer(slice_lens = [1, 1, 2*num_poles, 2*num_zeros])(x)
 x_gain = tf.keras.layers.Lambda(lambda x: 100.*x, name='Gain')(x_gain)
@@ -90,10 +88,12 @@ x_Rd   = tf.keras.layers.Lambda(lambda x:   1.*x, name='Rd')(x_Rd)
 x_p0   = tf.keras.layers.Lambda(to_complex, name='p0')(x_p0)
 x_z0   = tf.keras.layers.Lambda(to_complex, name='z0')(x_z0)
 
-model = tf.keras.Model(inputs=[inputs], outputs=[x_gain, x_Rd, x_p0, x_z0])
+model = tf.keras.Model(inputs=[input_pitch, input_Rd], outputs=[x_gain, x_Rd, x_p0, x_z0])
+
+#%%
 
 gain_weight = 0.1 # x/dB
-Rd_weight   = 1.   # x/Rd
+Rd_weight   = 4.   # x/Rd
 w_weight    = 0.01 * fs/(2.*np.pi)  # x/Hz
 r_weight    = 0.1 # x/dB  
 
@@ -106,8 +106,8 @@ losses = [lambda y_true, y_pred: util.weighted_mse_loss(y_true, y_pred, tf.squar
           lambda y_true, y_pred: util.pole_zero_loss(y_true, y_pred, r_weight, w_weight),
           lambda y_true, y_pred: util.pole_zero_loss(y_true, y_pred, r_weight, w_weight)]
 
-#%%
-model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=10E-5),
+
+model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=10E-4),
     loss=losses)
 
 model.summary()
@@ -116,16 +116,25 @@ model.summary()
 #%% Training
 print('Training Model')
 
-model.fit(x=f0, y=[g, Rd, p0, z0], 
+model.fit(x=[f0, Rd], y=[g, Rd, p0, z0], 
           epochs = 4000, 
           batch_size=20000,
           callbacks=[])
 
 #%% Plot predictions
 
-g_pred, Rd_pred, p0_pred, z0_pred = model.predict(f0, batch_size=20000)
+g_pred, Rd_pred, p0_pred, z0_pred = model.predict([f0,Rd], batch_size=20000)
 
 
+
+
+#%% 
+
+plt.plot(f0, Rd, f0, Rd_pred)
+plt.show()
+
+plt.plot(f0, g, f0, g_pred)
+plt.show()
 
 #%% Store Model
 print('Store Model')
