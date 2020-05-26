@@ -7,9 +7,9 @@ import os
 import sys
 sys.path.append(os.getcwd())
 
-import tools
-from tools.extract_overtones import extract_ovetones
-from tools.framed_audio import FramedAudio
+import hsvs.tools
+from hsvs.tools.extract_overtones import extract_ovetones
+from hsvs.tools.framed_audio import FramedAudio
 
 import matplotlib.pyplot as plt
 

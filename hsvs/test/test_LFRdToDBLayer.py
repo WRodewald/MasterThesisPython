@@ -7,13 +7,13 @@ import os
 import sys
 sys.path.append(os.getcwd())
 
-import model
-from model import LFRdToDBLayer
+import hsvs.model
+from hsvs.model import LFRdToDBLayer
 
 import unittest
 import tensorflow as tf
 
-import model.util as util
+import hsvs.model.util as util
 
 
 class test_LFRdToDBLayer(unittest.TestCase):

@@ -1,6 +1,6 @@
 #%%
-from tools.framed_audio import FramedAudio
-from tools import magnitude
+from .framed_audio import FramedAudio
+from . import magnitude
 import crepe
 
 import numpy as np

@@ -3,7 +3,7 @@ import tensorflow as tf
 import numpy as np
 import math
 
-from model import util
+from . import util
 
 # based on the matlab implementation of covarep:
 # G. Degottex, J. Kane, T. Drugman, T. Raitio and S. Scherer, 

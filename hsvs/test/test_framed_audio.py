@@ -3,14 +3,17 @@ import numpy as np
 
 import unittest
 
-import tools
-from tools.framed_audio import FramedAudio
-from tools import audio_io
+import hsvs.tools
+from hsvs.tools.framed_audio import FramedAudio
+from hsvs.tools import audio_io
+
+import os
 
 class Test_FramedAudio(unittest.TestCase):
 
     def test_from_file(self):   
-        src = 'test/audio_sample.ogg'
+        test_path = os.path.dirname(__file__)
+        src = os.path.join(test_path, 'audio_sample.ogg')
 
         audio = FramedAudio.from_file(src, 2048, 1024, True)
 
@@ -159,7 +162,8 @@ class Test_FramedAudio(unittest.TestCase):
         self.assertTrue( np.array_equal(audio.get_trajectory('traj'), audio2.get_trajectory('traj')))
         self.assertEqual( audio.get_config(), audio2.get_config())
 
-        src = 'test/audio_sample.ogg'
+        test_path = os.path.dirname(__file__)
+        src = os.path.join(test_path, 'audio_sample.ogg')
 
         audio = FramedAudio.from_file(src, 2048, 1024)
 

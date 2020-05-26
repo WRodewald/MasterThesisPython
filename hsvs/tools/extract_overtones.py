@@ -1,5 +1,5 @@
 import numpy as np
-from tools.framed_audio import FramedAudio
+from .framed_audio import FramedAudio
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 

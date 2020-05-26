@@ -7,14 +7,12 @@ import os
 import sys
 sys.path.append(os.getcwd())
 
-import model
-from model import ZPKToMagLayer
+import hsvs.model
+import hsvs.model.util as util
+from hsvs.model import ZPKToMagLayer
 
 import unittest
 import tensorflow as tf
-
-import model.util as util
-
 
 class test_model_util(unittest.TestCase):
 

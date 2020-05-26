@@ -3,7 +3,7 @@ import numpy as np
 import json
 import os
 
-from tools import audio_io
+from . import audio_io
 
 
 # TODO implement feature to write to a framed audio in addition to reading frames from it?

@@ -3,7 +3,7 @@ import tensorflow as tf
 import numpy as np
 import math
 
-from model import util
+from . import util
 
 class LFRdToDBLayer(tf.keras.layers.Layer):
     """Approxmates an LF-Rd magnitude response using a 4th order bandpass respponse"""

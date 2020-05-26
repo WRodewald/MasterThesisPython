@@ -3,7 +3,7 @@ import numpy as np
 import json
 import os
 
-from tools import lf_rd
+from . import lf_rd
 import scipy.signal as signal
 
 import numba

@@ -3,9 +3,9 @@ import numpy as np
 
 import unittest
 
-import tools
-from tools.framed_audio import FramedAudio
-from tools import pitch_optimize
+import hsvs.tools
+from hsvs.tools.framed_audio import FramedAudio
+from hsvs.tools import pitch_optimize
 
 import matplotlib.pyplot as plt
 

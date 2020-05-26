@@ -6,8 +6,8 @@ import numpy as np
 import unittest
 import tensorflow as tf
 
-import model
-from model import NormalizeLayer
+import hsvs.model
+from hsvs.model import NormalizeLayer
 
 
 class test_NormalizeLayer(unittest.TestCase):

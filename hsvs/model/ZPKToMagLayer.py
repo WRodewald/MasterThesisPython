@@ -2,7 +2,7 @@
 import tensorflow as tf
 import numpy as np
 
-from model import util
+from . import util
 
 
 class ZPKToMagLayer(tf.keras.layers.Layer):

@@ -3,9 +3,9 @@ import numpy as np
 
 import unittest
 
-import tools
-from tools.pitch_acf import pitch_acf
-from tools.framed_audio import FramedAudio
+import hsvs.tools
+from hsvs.tools.pitch_acf import pitch_acf
+from hsvs.tools.framed_audio import FramedAudio
 
 class Test_pitch_acf(unittest.TestCase):
 

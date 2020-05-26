@@ -1,6 +1,6 @@
 
 import numpy as np
-from tools import BiQuad
+from . import BiQuad
 
 import numba
 
