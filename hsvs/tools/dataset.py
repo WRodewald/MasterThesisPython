@@ -21,7 +21,7 @@ def is_vocalset_root(path):
 
 # returns the location of the vocalset.json configuration file an containing folder
 def get_config_json_path():
-    build_dir = os.path.abspath(os.path.join(__file__, os.pardir, os.pardir, 'build'))
+    build_dir = os.path.abspath(os.path.join(__file__, os.pardir, os.pardir,  os.pardir, 'build')) # sorry
     json_path = os.path.join(build_dir, 'vocalset.json')
 
     return build_dir, json_path 

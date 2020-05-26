@@ -160,6 +160,11 @@ class FramedAudio:
         if(json_file == None):
             json_file = os.path.splitext(self.src_file)[0] + '.json'
 
+        # create folder
+        json_dir = os.path.dirname(json_file)
+        if not os.path.exists(json_dir):
+            os.makedirs(json_dir)
+
         # write
         with open(json_file, 'w+') as outfile:
             json.dump(data, outfile)
