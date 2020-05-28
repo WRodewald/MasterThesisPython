@@ -95,7 +95,8 @@ class FramedAudio:
 
     # sets an attribute to be exported / cached as json
     def store_trajectory(self, attr_key, attr_val):
-        assert attr_val.size == self.get_num_frames(), 'a trajectory must have the same number of samples as frames'
+
+        assert len(attr_val) == self.get_num_frames(), 'a trajectory must have the same number of samples as frames'
         self.trajectories[attr_key] = attr_val
         
     def get_trajectory(self, attr_key):
@@ -170,7 +171,7 @@ class FramedAudio:
             json.dump(data, outfile)
 
     @staticmethod
-    def from_json(json_file):
+    def from_json(json_file, wav_replacement = None):
 
         try:
             with open(json_file) as json_dict:       
@@ -185,8 +186,9 @@ class FramedAudio:
                 for key in data['data']:
                     trajectories[key] = np.asarray(data['data'][key])
 
+
                 # src file  
-                src = None
+                src = wav_replacement
                 if('src' in data):
                     src = data['src']
 

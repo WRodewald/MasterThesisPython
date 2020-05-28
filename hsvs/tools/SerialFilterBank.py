@@ -3,6 +3,7 @@ import numpy as np
 from . import BiQuad
 
 import numba
+from tqdm import tqdm
 
 BiQuad_type = numba.deferred_type()
 BiQuad_type.define(BiQuad.BiQuad.class_type.instance_type)
@@ -15,7 +16,7 @@ spec = [
 class SerialFilterBank:
 
 
-    def tick(self, x):
+    def tick(self, x, verbose=False):
         
         if np.isscalar(x):
             y = x
@@ -23,15 +24,17 @@ class SerialFilterBank:
                 y = filter.tick(y)
             return y
         else:
+            
             y = x
-            for i in range(len(y)):                
+            for i in tqdm(range(len(y)), disable=(not verbose)):       
                 for filter in self.filters:
                     y[i] = filter.tick(y[i])
             return y
 
 
     #processes signal with per-sample pole zero updates
-    def tick_pz(self, x, poles, zeros):
+    def tick_pz(self, x, poles, zeros, verbose = False):
+
 
         if np.isscalar(x):
             self.set_pz_conjugates(poles, zeros)
@@ -40,8 +43,9 @@ class SerialFilterBank:
                 y = filter.tick(y)
             return y
         else:
+            
             y = x
-            for i in range(len(y)):                
+            for i in tqdm(range(len(y)), disable=(not verbose)):                
                 self.set_pz_conjugates(poles[i,:], zeros[i,:])
                 for filter in self.filters:                    
                     y[i] = filter.tick(y[i])

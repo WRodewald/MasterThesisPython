@@ -27,6 +27,22 @@ def extract_ovetones(frame, pitch, pitch_inc, fs, num_overtones = 10, resynthesi
     else:
         return overtones
 
+def synthesize_overtones(overtones, pitch, pitch_inc, fs, N):
+    
+    num_overtones = len(overtones)
+
+    overtones = np.reshape(overtones, [num_overtones, 1])
+
+    k = np.reshape(np.arange(1,num_overtones+1), (-1,1)).T
+    
+    t = (np.arange(N) - 0.5 * N + 0.5)/fs
+
+    phase = np.reshape(pitch * t + 0.5 * pitch_inc * t * t, (-1,1))
+
+    resynth = 2. * np.abs(overtones.T) * np.cos(2. * np.pi * k * phase + np.angle(overtones.T))
+    resynth = np.real(np.sum(resynth,1)) / 2
+    return resynth
+
 def extract_overtones_from_audio(audio, pitch = None, pitch_inc = None, num_overtones = 40):
     
     if(pitch == None): 
