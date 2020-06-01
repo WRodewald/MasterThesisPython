@@ -189,7 +189,7 @@ class FramedAudio:
 
                 # src file  
                 src = wav_replacement
-                if('src' in data):
+                if(('src' in data ) and (wav_replacement is None)):
                     src = data['src']
 
                 # create object
