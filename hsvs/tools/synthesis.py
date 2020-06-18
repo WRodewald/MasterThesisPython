@@ -7,10 +7,13 @@ from scipy import interpolate
 
 from hsvs.model import util
 
-def run(pitch, Rd, gain, poles, zeros, fs, hop_size, verbose = True):
+def run(pitch, Rd, gain, poles, zeros, fs, hop_size, verbose = True, noise=None):
 
     num_poles   = poles.shape[1]
     num_samples = pitch.shape[0]
+
+        
+
 
     # create oscillator and filter bank
     osc = RdOscillator.RdOscillator(num_instances=64, num_samples=512)
@@ -30,6 +33,10 @@ def run(pitch, Rd, gain, poles, zeros, fs, hop_size, verbose = True):
     # process oscillator
     print('processing source')
     audio = osc.tick(Rd_interpolator(t_audio), f0_interpolator(t_audio), fs)
+
+    # optional noise
+    if(noise is not None):
+        audio += (2. * np.random.rand(*audio.shape) -1.) * util.db2mag(noise).numpy()
 
     # gain
     print('processing gain')
