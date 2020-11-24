@@ -22,16 +22,16 @@ import tensorflow as tf
 from tensorflow import keras
 
 # custom network
-from model import LFRdLayer
-from model import ZPKToMagLayer
-from model import TemporalVarianceLayer
-from model import ParameterLayer
-from model import BSplineLayer
-from model import util
+from hsvs.model import LFRdLayer
+from hsvs.model import ZPKToMagLayer
+from hsvs.model import TemporalVarianceLayer
+from hsvs.model import ParameterLayer
+from hsvs.model import BSplineLayer
+from hsvs.model import util
 
 # audio management
-from tools.framed_audio import FramedAudio
-from tools import extract_overtones, magnitude, dataset
+from hsvs.tools.framed_audio import FramedAudio
+from hsvs.tools import extract_overtones, magnitude, dataset
 
 # enable os.environ line to disable GPU support 
 import os
@@ -164,9 +164,9 @@ tboard_callback = tf.keras.callbacks.TensorBoard(log_dir = logs, histogram_freq 
 
 model.fit(x=predictor, y=response, 
           shuffle=False,
-          epochs = 4000, 
+          epochs = 40, 
           batch_size=40000,
-          callbacks=[])
+          callbacks=[tboard_callback])
 
 
 #%% Export .mat file
