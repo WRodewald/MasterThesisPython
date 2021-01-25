@@ -13,13 +13,13 @@ class ZPKToMagLayer(tf.keras.layers.Layer):
         super(ZPKToMagLayer, self).__init__(**kwargs)
 
         self.sample_rate = sample_rate
-        self.output_size = output_size;
+        self.output_size = output_size
 
 
         # indice of overtones
         self.k = tf.constant(tf.range(1,output_size+1, 1.), shape = [1, 1, output_size])
         
-        self.w0 = tf.constant(2 * np.pi / sample_rate);
+        self.w0 = tf.constant(2 * np.pi / sample_rate)
 
 
     def build(self, input_shapes):
@@ -84,9 +84,9 @@ class ZPKToMagLayer(tf.keras.layers.Layer):
         
         # adjust dimensionality
 
-        z0 = tf.expand_dims(z0, 2);
-        p0 = tf.expand_dims(p0, 2);
-        k  = tf.expand_dims(k, 1);
+        z0 = tf.expand_dims(z0, 2)
+        p0 = tf.expand_dims(p0, 2)
+        k  = tf.expand_dims(k, 1)
 
         # feed forward and feed back 
         Hff = (z - z0) * (z - tf.math.conj(z0))        
@@ -104,8 +104,8 @@ class ZPKToMagLayer(tf.keras.layers.Layer):
         input_tensor = inputs[0]
 
         # sampling positions
-        f0 = tf.expand_dims(inputs[1],1);
-        w  = f0 * self.k * self.w0;
+        f0 = tf.expand_dims(inputs[1],1)
+        w  = f0 * self.k * self.w0
 
         # filter coeff extraction
         z0, p0, k = self.extract_zpk_parameters(input_tensor)
